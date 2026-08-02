@@ -3,4 +3,5 @@ node_modules/
 .wwebjs_cache/
 *.db
 .env
+.env.example
 Durga-Digital_library/
