@@ -1,16 +1,24 @@
-const sqlite3 = require('sqlite3').verbose();
-const db = new sqlite3.Database('./library_master.db');
+const sqlite3 = require('sqlite3');
+const { open } = require('sqlite');
+const path = require('path');
 
-// 🔴 SAARE STUDENTS KO DELETE KARNE KE LIYE:
-db.run("DELETE FROM admissions", (err) => {
-    if (err) console.error("Error:", err.message);
-    else console.log("✅ Saare registered students delete ho gaye hain!");
-});
+async function clearData() {
+  try {
+    const db = await open({
+      filename: path.join(__dirname, 'library.db'),
+      driver: sqlite3.Database
+    });
 
-/* 
-// 🔴 KISI EK SPECIFIC EMAIL SE DELETE KARNE KE LIYE (Upar wale ko comment karke ise uncomment kar sakte hain):
-db.run("DELETE FROM admissions WHERE email_id = 'student@gmail.com'", (err) => {
-    if (err) console.error("Error:", err.message);
-    else console.log("✅ Student delete ho gaya!");
-});
-*/
+    // Clear Students Data and Booked Seats
+    await db.exec(`DELETE FROM students;`);
+    await db.exec(`DELETE FROM seats;`);
+
+    console.log('🧹 All Students and Seat bookings cleared successfully from SQLite!');
+    process.exit(0);
+  } catch (err) {
+    console.error('❌ Error clearing database:', err.message);
+    process.exit(1);
+  }
+}
+
+clearData();

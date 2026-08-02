@@ -1,26 +1,36 @@
 {
   "name": "durga-library-system",
   "version": "1.0.0",
-  "description": "",
+  "description": "Durga Digital Library Management System",
   "main": "index.js",
+  "type": "commonjs",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yuvraj5657663/Durga-Digital_library.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/yuvraj5657663/Durga-Digital_library/issues"
+  },
+  "homepage": "https://github.com/yuvraj5657663/Durga-Digital_library#readme",
   "dependencies": {
+    "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
-    "jwt-simple": "^0.5.6",
     "node-cron": "^4.6.0",
     "nodemailer": "^9.0.3",
     "pdfkit": "^0.19.1",
     "qrcode-terminal": "^0.12.0",
+    "sqlite": "^5.1.1",
     "sqlite3": "^6.0.1",
     "whatsapp-web.js": "^1.34.7"
   }
