@@ -8,6 +8,7 @@ const path = require('path');
 const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const { connectDB } = require('./src/config/db');
+const mongoose = require('mongoose');
 const Student = require('./src/models/Student');
 const Seat = require('./src/models/Seat');
 const Inquiry = require('./src/models/Inquiry');
@@ -16,14 +17,43 @@ const ArchivedStudent = require('./src/models/ArchivedStudent');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors());
+// CORS — restrict to ALLOWED_ORIGINS in production; allow all in dev (fallback)
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim()).filter(Boolean)
+  : [];
+
+app.use(cors({
+  origin: (origin, cb) => {
+    // Allow server-to-server / curl calls (no origin header) and whitelisted origins.
+    // If no whitelist configured, allow everything (development / first-boot convenience).
+    if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+      return cb(null, true);
+    }
+    cb(new Error(`CORS: origin ${origin} not allowed`));
+  },
+  credentials: true
+}));
+
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Track MongoDB readiness so the middleware below can gate API calls
+let isDbReady = false;
+
 // Connect to MongoDB Atlas on startup
-connectDB().catch(err => {
-  console.error('❌ Failed to connect to MongoDB:', err.message);
-  process.exit(1);
+connectDB()
+  .then(() => { isDbReady = true; })
+  .catch(err => {
+    console.error('❌ Failed to connect to MongoDB:', err.message);
+    process.exit(1);
+  });
+
+// DB readiness gate — return 503 while Atlas connection is still being established
+app.use((req, res, next) => {
+  if (!isDbReady && req.path.startsWith('/api/v1/') && req.path !== '/api/v1/health') {
+    return res.status(503).json({ success: false, message: 'Database connecting, please retry in a moment.' });
+  }
+  next();
 });
 
 // -------------------------------------------------------------
@@ -212,29 +242,43 @@ Aapki Fee Receipt PDF neeche attached hai. Thank you!`;
 }
 
 // Helper: send admission WhatsApp + PDF (reused by manual + online-admission accept)
+// WA failure is logged but does NOT crash or reject the admission — non-blocking by design.
 async function sendAdmissionWhatsApp(s, pdfBuffer) {
   if (!s.mobile || !isWaReady) return;
-  let cleanMobile = s.mobile.replace(/\D/g, '');
-  if (cleanMobile.length === 10) cleanMobile = `91${cleanMobile}`;
-  const waChatId = `${cleanMobile}@c.us`;
-  const media = new MessageMedia('application/pdf', pdfBuffer.toString('base64'), `Receipt_${s.seatCode}.pdf`);
-  await whatsappClient.sendMessage(waChatId, buildAdmissionWaMessage(s));
-  await whatsappClient.sendMessage(waChatId, media);
-  console.log(`💬 WhatsApp receipt sent to +${cleanMobile}`);
+  try {
+    let cleanMobile = s.mobile.replace(/\D/g, '');
+    if (cleanMobile.length === 10) cleanMobile = `91${cleanMobile}`;
+    const waChatId = `${cleanMobile}@c.us`;
+    const media = new MessageMedia('application/pdf', pdfBuffer.toString('base64'), `Receipt_${s.seatCode}.pdf`);
+    await whatsappClient.sendMessage(waChatId, buildAdmissionWaMessage(s));
+    await whatsappClient.sendMessage(waChatId, media);
+    console.log(`💬 WhatsApp receipt sent to +${cleanMobile}`);
+  } catch (err) {
+    // WhatsApp failures must never abort an admission — just log and continue
+    console.error('⚠️  WhatsApp send failed (admission still saved):', err.message);
+  }
+}
+
+// Helper: parse shift number robustly from any string like "Shift 1", "Shift 4", "1", "Full Day"
+function parseShiftNum(shiftStr) {
+  if (!shiftStr) return 1;
+  const digits = shiftStr.replace(/[^0-9]/g, '');
+  const n = parseInt(digits, 10);
+  return (n >= 1 && n <= 4) ? n : 1;
 }
 
 // Helper: upsert a seat in the Seat collection (reused by create + accept + edit)
 async function upsertSeat(seatCode, shiftStr, studentData) {
-  const seatNum  = seatCode  ? parseInt(seatCode.replace(/\D/g, ''))        : 1;
-  const shiftNum = shiftStr  ? parseInt(shiftStr.replace(/[^0-9]/g, '')) || 1 : 1;
+  const seatNum  = seatCode ? parseInt(seatCode.replace(/\D/g, ''), 10) : 1;
+  const shiftNum = parseShiftNum(shiftStr);
   const seatKey  = `s_${seatNum}_shift_${shiftNum}`;
   await Seat.findOneAndUpdate(
     { seat_key: seatKey },
     {
-      seat_key:    seatKey,
-      seat_number: seatNum,
-      shift:       shiftNum,
-      is_booked:   1,
+      seat_key:     seatKey,
+      seat_number:  seatNum,
+      shift:        shiftNum,
+      is_booked:    1,
       student_name: studentData.name        || '',
       mobile:       studentData.mobile      || '',
       preparation:  studentData.preparation || '',
@@ -248,8 +292,8 @@ async function upsertSeat(seatCode, shiftStr, studentData) {
 // Helper: free a seat by seatCode + shift string
 async function freeSeat(seatCode, shiftStr) {
   if (!seatCode) return;
-  const seatNum  = parseInt(seatCode.replace(/\D/g, ''));
-  const shiftNum = shiftStr ? parseInt(shiftStr.replace(/[^0-9]/g, '')) || 1 : 1;
+  const seatNum  = parseInt(seatCode.replace(/\D/g, ''), 10);
+  const shiftNum = parseShiftNum(shiftStr);
   const seatKey  = `s_${seatNum}_shift_${shiftNum}`;
   await Seat.deleteOne({ seat_key: seatKey });
 }
@@ -257,6 +301,28 @@ async function freeSeat(seatCode, shiftStr) {
 // -------------------------------------------------------------
 // 3. API Routes
 // -------------------------------------------------------------
+
+// Health check — used by PM2, load balancers, and uptime monitors
+app.get('/api/v1/health', async (req, res) => {
+  const dbState = ['disconnected', 'connected', 'connecting', 'disconnecting'];
+  const mongoState = dbState[mongoose.connection.readyState] || 'unknown';
+  const ok = mongoose.connection.readyState === 1;
+  res.status(ok ? 200 : 503).json({
+    status:    ok ? 'ok' : 'degraded',
+    db:        mongoState,
+    uptime:    Math.floor(process.uptime()),
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Public config — exposes safe frontend-needed values from env (no secrets)
+app.get('/api/v1/config', (req, res) => {
+  res.json({
+    success:      true,
+    inquiryLink:  process.env.INQUIRY_LINK || '',
+    upiId:        process.env.UPI_ID       || ''
+  });
+});
 
 // Admin Login
 app.post('/api/v1/admin/login', (req, res) => {
@@ -351,7 +417,7 @@ app.post('/api/v1/students', async (req, res) => {
     res.status(201).json({ success: true, message: 'Student registered & saved to database successfully!' });
   } catch (err) {
     console.error('❌ DB/Notification Error:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -395,15 +461,30 @@ app.get('/api/v1/seats', async (req, res) => {
 });
 
 // Alerts API (Upcoming Expiring Seats in 5 Days)
+// Normalises field names to match frontend expectations:
+//   frontend reads: a.seat_code, a.expiry_date (snake_case from old SQLite schema)
 app.get('/api/v1/alerts', async (req, res) => {
   try {
     const today    = new Date();
     const students = await Student.find({});
-    const alerts   = students.filter(s => {
-      if (!s.expiryDate) return false;
-      const diffDays = Math.ceil((new Date(s.expiryDate) - today) / (1000 * 60 * 60 * 24));
-      return diffDays >= 0 && diffDays <= 5;
-    });
+    const alerts   = students
+      .filter(s => {
+        if (!s.expiryDate) return false;
+        const diffDays = Math.ceil((new Date(s.expiryDate) - today) / (1000 * 60 * 60 * 24));
+        return diffDays >= 0 && diffDays <= 5;
+      })
+      .map(s => ({
+        id:          s._id.toString(),
+        name:        s.name,
+        mobile:      s.mobile,
+        // provide both camelCase (Mongoose) and snake_case (frontend legacy) field names
+        seatCode:    s.seatCode,
+        seat_code:   s.seatCode,
+        expiryDate:  s.expiryDate,
+        expiry_date: s.expiryDate,
+        shift:       s.shift,
+        preparation: s.preparation
+      }));
     res.json({ success: true, alerts });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

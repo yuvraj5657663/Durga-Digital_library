@@ -36,6 +36,22 @@ function toggleFinAmounts() {
   if (eyeBtn) eyeBtn.innerText = finAmountsVisible ? "👁" : "🙈";
 }
 
+// Module-level config loaded from server (populated by loadAppConfig on login)
+let appConfig = { inquiryLink: '', upiId: '' };
+
+// Load safe public config values (INQUIRY_LINK, UPI_ID) from the server
+async function loadAppConfig() {
+  try {
+    const res  = await fetch(`${API}/config`);
+    const data = await res.json();
+    if (data.success) {
+      appConfig.inquiryLink = data.inquiryLink || '';
+      appConfig.upiId       = data.upiId       || '';
+    }
+  } catch (err) {
+    console.error('Failed to load app config:', err);
+  }
+}
 // Base monthly prices for 3 shifts
 const SHIFT_DEFAULTS = {
   1: { hours: "6 AM - 12 PM (6 Hours)", baseFee: 400 },
@@ -128,6 +144,7 @@ function showDashboard() {
   loadStudentDirectory(); 
   loadInquiriesDirectory(); // Load inquiries from Google Forms
   loadOnlineAdmissions();   // Load pending online admissions
+  loadAppConfig();          // Load public server config (inquiry link, UPI id)
 }
 
 // ---------- Sidebar Controls ----------
@@ -568,12 +585,15 @@ function renderStudentDirectory() {
       <td><strong style="color:var(--red-booked, #dc2626);">${s.expiryDate || 'N/A'}</strong></td>
       <td style="white-space:nowrap;">
         <button
-          onclick='openEditStudentModal(${JSON.stringify(s)})'
+          data-student-id="${s.id || s._id}"
+          onclick="openEditStudentById(this.dataset.studentId)"
           style="padding:4px 12px; font-size:0.78rem; font-weight:600; border-radius:5px; border:1px solid #3b82f6; background:#eff6ff; color:#1d4ed8; cursor:pointer; margin-right:4px;">
           ✏️ Edit
         </button>
         <button
-          onclick="deleteStudent(${s.id}, '${(s.name || '').replace(/'/g, "\\'")}')"
+          data-student-id="${s.id || s._id}"
+          data-student-name="${(s.name || '').replace(/"/g, '&quot;')}"
+          onclick="deleteStudent(this.dataset.studentId, this.dataset.studentName)"
           style="padding:4px 12px; font-size:0.78rem; font-weight:600; border-radius:5px; border:1px solid #dc2626; background:#fff1f2; color:#dc2626; cursor:pointer;">
           🗑️ Delete
         </button>
@@ -606,9 +626,8 @@ function renderInquiriesDirectory() {
 
 // ---------- Share Form Link Handler (WhatsApp Promo Link) ----------
 document.getElementById("share-form-btn")?.addEventListener("click", () => {
-  const formUrl = "https://forms.gle/YOUR_LINK"; // Apni Google Form Link
+  const formUrl = appConfig.inquiryLink || "https://forms.gle/HgSDtMLqnCZgreBe8";
   const shareMsg = `📚 *Durga Digital Library, Munger* 📚%0A📍 Near Shiv Mandir, NH-80, Kalarampur, Munger%0A📞 Contact: Saurav Kumar - 7424893960%0A%0A*Facilities Available:*%0A- 24/7 Open Library%0A- 🎥 24x7 CCTV Camera%0A- 🧼 Clean Washroom%0A- 💧 RO Mineral Water%0A- 🌐 High-Speed Wi-Fi%0A- ❄️ Fully A.C.%0A- ⚡ Power Backup%0A%0ASeat Booking / Admission Inquiry Form:%0A👉 ${encodeURIComponent(formUrl)}`;
-  
   window.open(`https://api.whatsapp.com/send?text=${shareMsg}`, '_blank');
 });
 
@@ -660,6 +679,14 @@ async function loadAlerts() {
 // =============================================================
 // FEATURE 1 – EDIT STUDENT
 // =============================================================
+
+// Safe wrapper: look up the student object from the in-memory array by ID
+// This avoids embedding raw JSON in onclick attributes (XSS vector)
+function openEditStudentById(id) {
+  const student = studentDirectory.find(s => (s.id || s._id) === id || String(s._id) === String(id));
+  if (!student) { alert('Student record not found. Please refresh the page.'); return; }
+  openEditStudentModal(student);
+}
 
 // Open Edit modal pre-filled with the student's current data
 function openEditStudentModal(student) {
