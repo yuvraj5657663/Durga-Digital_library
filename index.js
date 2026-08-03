@@ -5,6 +5,8 @@ const nodemailer = require('nodemailer');
 const cron = require('node-cron');
 const PDFDocument = require('pdfkit');
 const path = require('path');
+const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const { connectDB } = require('./src/config/db');
@@ -16,11 +18,23 @@ const ArchivedStudent = require('./src/models/ArchivedStudent');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const JWT_SECRET = process.env.JWT_SECRET || '';
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
 // CORS — restrict to ALLOWED_ORIGINS in production; allow all in dev (fallback)
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim()).filter(Boolean)
   : [];
+
+if (IS_PRODUCTION && allowedOrigins.length === 0) {
+  console.error('ALLOWED_ORIGINS must be set in production.');
+  process.exit(1);
+}
+
+if (IS_PRODUCTION && JWT_SECRET.length < 32) {
+  console.error('JWT_SECRET must be at least 32 characters in production.');
+  process.exit(1);
+}
 
 app.use(cors({
   origin: (origin, cb) => {
@@ -34,8 +48,90 @@ app.use(cors({
   credentials: true
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: '100kb' }));
 app.use(express.static(path.join(__dirname, 'public')));
+
+function hashValue(value) {
+  return crypto.createHash('sha256').update(String(value || '')).digest();
+}
+
+function safeEqual(a, b) {
+  return crypto.timingSafeEqual(hashValue(a), hashValue(b));
+}
+
+function normalizeMobile(mobile) {
+  const digits = String(mobile || '').replace(/\D/g, '');
+  if (digits.length === 10) return `91${digits}`;
+  return digits;
+}
+
+function isValidMobile(mobile) {
+  const digits = normalizeMobile(mobile);
+  return digits.length >= 10 && digits.length <= 15;
+}
+
+function isValidEmail(email) {
+  if (!email) return true;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim());
+}
+
+function isValidObjectId(id) {
+  return mongoose.Types.ObjectId.isValid(id);
+}
+
+function createRateLimiter({ windowMs, max }) {
+  const hits = new Map();
+  return (req, res, next) => {
+    const key = `${req.ip}:${req.method}:${req.originalUrl.split('?')[0]}`;
+    const now = Date.now();
+    const current = hits.get(key) || { count: 0, resetAt: now + windowMs };
+    if (now > current.resetAt) {
+      current.count = 0;
+      current.resetAt = now + windowMs;
+    }
+    current.count += 1;
+    hits.set(key, current);
+    if (current.count > max) {
+      return res.status(429).json({ success: false, message: 'Too many requests. Please try again later.' });
+    }
+    next();
+  };
+}
+
+const loginLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 10 });
+const publicWriteLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 30 });
+
+function requireAdmin(req, res, next) {
+  const authHeader = req.headers.authorization || '';
+  const [scheme, token] = authHeader.split(' ');
+  if (scheme !== 'Bearer' || !token) {
+    return res.status(401).json({ success: false, message: 'Unauthorized: token required.' });
+  }
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET || 'development-only-secret-change-me');
+    if (decoded.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Forbidden: admin role required.' });
+    }
+    req.user = decoded;
+    next();
+  } catch (err) {
+    return res.status(401).json({ success: false, message: 'Unauthorized: invalid or expired token.' });
+  }
+}
+
+function buildAdmissionResponseMessage(student, notification) {
+  const sent = [];
+  const failed = [];
+  if (notification.whatsapp.sent) sent.push('WhatsApp');
+  else failed.push('WhatsApp');
+  if (notification.email.sent) sent.push('Email');
+  else if (notification.email.attempted) failed.push('Email');
+  if (notification.pdf.generated) sent.push('PDF');
+
+  const sentText = sent.length ? ` Sent/generated: ${sent.join(', ')}.` : '';
+  const failedText = failed.length ? ` Pending/failed: ${failed.join(', ')}.` : '';
+  return `Admission accepted for ${student.name}.${sentText}${failedText}`;
+}
 
 // Track MongoDB readiness so the middleware below can gate API calls
 let isDbReady = false;
@@ -259,6 +355,50 @@ async function sendAdmissionWhatsApp(s, pdfBuffer) {
   }
 }
 
+async function sendAdmissionEmail(s, pdfBuffer) {
+  const senderEmail = process.env.EMAIL_USER || process.env.GMAIL_USER;
+  if (!s.email) {
+    return { attempted: false, sent: false, attachmentSent: false, reason: 'email_missing' };
+  }
+  if (!senderEmail) {
+    return { attempted: false, sent: false, attachmentSent: false, reason: 'smtp_sender_missing' };
+  }
+  try {
+    const info = await transporter.sendMail({
+      from:    `Durga Digital Library <${senderEmail}>`,
+      to:      s.email,
+      subject: `Admission Confirmed - Seat ${s.seatCode}`,
+      text:    `Namaste ${s.name},\n\nAapka admission confirm ho gaya hai!\nReceipt PDF attached hai.\n\nThank You!\nDurga Digital Library\nContact: 7424893960`,
+      attachments: [{ filename: `Receipt_${s.seatCode}.pdf`, content: pdfBuffer }]
+    });
+    return { attempted: true, sent: true, attachmentSent: true, messageId: info.messageId };
+  } catch (err) {
+    console.error('Email Sending Error:', err.message);
+    return { attempted: true, sent: false, attachmentSent: false, reason: err.message };
+  }
+}
+
+async function sendAdmissionWhatsAppWithStatus(s, pdfBuffer) {
+  if (!s.mobile) {
+    return { attempted: false, sent: false, attachmentSent: false, reason: 'mobile_missing' };
+  }
+  if (!isWaReady) {
+    return { attempted: false, sent: false, attachmentSent: false, reason: 'whatsapp_not_ready' };
+  }
+  try {
+    const cleanMobile = normalizeMobile(s.mobile);
+    const waChatId = `${cleanMobile}@c.us`;
+    const media = new MessageMedia('application/pdf', pdfBuffer.toString('base64'), `Receipt_${s.seatCode}.pdf`);
+    await whatsappClient.sendMessage(waChatId, buildAdmissionWaMessage(s));
+    await whatsappClient.sendMessage(waChatId, media);
+    console.log(`WhatsApp receipt sent to +${cleanMobile}`);
+    return { attempted: true, sent: true, attachmentSent: true, phone: cleanMobile };
+  } catch (err) {
+    console.error('WhatsApp send failed (admission still saved):', err.message);
+    return { attempted: true, sent: false, attachmentSent: false, reason: err.message };
+  }
+}
+
 // Helper: parse shift number robustly from any string like "Shift 1", "Shift 4", "1", "Full Day"
 function parseShiftNum(shiftStr) {
   if (!shiftStr) return 1;
@@ -287,6 +427,28 @@ async function upsertSeat(seatCode, shiftStr, studentData) {
     { upsert: true, new: true }
   );
   return { seatKey, seatNum, shiftNum };
+}
+
+async function findSeatConflict(seatCode, shiftStr, excludeStudentId = null) {
+  const seatNum = seatCode ? parseInt(String(seatCode).replace(/\D/g, ''), 10) : NaN;
+  if (!Number.isInteger(seatNum) || seatNum < 1 || seatNum > 24) {
+    return { invalid: true, message: 'Seat code must be between DDL001 and DDL024.' };
+  }
+
+  const shiftNum = parseShiftNum(shiftStr);
+  const seatKey = `s_${seatNum}_shift_${shiftNum}`;
+  const studentQuery = { seatCode, shift: shiftStr };
+  if (excludeStudentId) studentQuery._id = { $ne: excludeStudentId };
+
+  const [student, seat] = await Promise.all([
+    Student.findOne(studentQuery),
+    Seat.findOne({ seat_key: seatKey })
+  ]);
+
+  if (student || (seat && (!excludeStudentId || String(seat.mobile || '') !== ''))) {
+    return { conflict: true, message: `${seatCode} is already booked for ${shiftStr}.` };
+  }
+  return { conflict: false, seatKey, seatNum, shiftNum };
 }
 
 // Helper: free a seat by seatCode + shift string
@@ -325,27 +487,47 @@ app.get('/api/v1/config', (req, res) => {
 });
 
 // Admin Login
-app.post('/api/v1/admin/login', (req, res) => {
+app.post('/api/v1/admin/login', loginLimiter, (req, res) => {
   const { username, password } = req.body;
   const adminUser = process.env.ADMIN_USER || 'admin';
   const adminPass = process.env.ADMIN_PASS || 'admin123';
-  if (username === adminUser && password === adminPass) {
-    res.json({ token: 'durga-library-secret-token-xyz' });
+  if (safeEqual(username, adminUser) && safeEqual(password, adminPass)) {
+    const token = jwt.sign(
+      { role: 'admin', username: adminUser },
+      JWT_SECRET || 'development-only-secret-change-me',
+      { expiresIn: process.env.JWT_EXPIRES_IN || '8h' }
+    );
+    res.json({ success: true, token, expiresIn: process.env.JWT_EXPIRES_IN || '8h' });
   } else {
-    res.status(401).json({ message: 'Invalid username or password' });
+    res.status(401).json({ success: false, message: 'Invalid username or password' });
   }
 });
 
 // Google Form Inquiry Submission Endpoint
-app.post('/api/v1/inquiries', async (req, res) => {
+app.post('/api/v1/inquiries', publicWriteLimiter, async (req, res) => {
   try {
     const { name, mobile, email, preparation, preferred_shift } = req.body;
+    const normalizedMobile = normalizeMobile(mobile);
     if (!name || !mobile) {
       return res.status(400).json({ success: false, message: 'Name and Mobile are required' });
     }
+    if (!isValidMobile(mobile)) {
+      return res.status(400).json({ success: false, message: 'Mobile number is invalid.' });
+    }
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ success: false, message: 'Email address is invalid.' });
+    }
+
+    const duplicate = await Inquiry.findOne({
+      normalizedMobile,
+      admission_status: 'Pending'
+    });
+    if (duplicate) {
+      return res.status(409).json({ success: false, message: 'A pending inquiry already exists for this mobile number.' });
+    }
 
     await Inquiry.create({
-      name, mobile, email: email || '', preparation: preparation || '',
+      name, mobile, normalizedMobile, email: email || '', preparation: preparation || '',
       preferred_shift: preferred_shift || ''
     });
     console.log(`📩 New Inquiry Saved: ${name} (${mobile})`);
@@ -364,8 +546,8 @@ app.post('/api/v1/inquiries', async (req, res) => {
   }
 });
 
-// Fetch All Inquiries
-app.get('/api/v1/inquiries', async (req, res) => {
+// Fetch All Inquiries — admin only
+app.get('/api/v1/inquiries', requireAdmin, async (req, res) => {
   try {
     const inquiriesList = await Inquiry.find({}).sort({ createdAt: -1 });
     res.json({ success: true, inquiries: inquiriesList });
@@ -375,15 +557,31 @@ app.get('/api/v1/inquiries', async (req, res) => {
 });
 
 // Student Registration & Fee Payment Flow
-app.post('/api/v1/students', async (req, res) => {
+app.post('/api/v1/students', requireAdmin, async (req, res) => {
   const s = req.body;
   try {
+    if (!s.name || !s.mobile || !s.seatCode || !s.shift || !s.joiningDate || !s.expiryDate) {
+      return res.status(400).json({ success: false, message: 'name, mobile, seatCode, shift, joiningDate and expiryDate are required.' });
+    }
+    if (!isValidMobile(s.mobile)) {
+      return res.status(400).json({ success: false, message: 'Mobile number is invalid.' });
+    }
+    if (!isValidEmail(s.email)) {
+      return res.status(400).json({ success: false, message: 'Email address is invalid.' });
+    }
+
+    const seatConflict = await findSeatConflict(s.seatCode, s.shift);
+    if (seatConflict.invalid || seatConflict.conflict) {
+      return res.status(seatConflict.invalid ? 400 : 409).json({ success: false, message: seatConflict.message });
+    }
+
     // 1. Insert Student
     await Student.create({
       seatCode:    s.seatCode,
       name:        s.name,
       email:       s.email       || '',
       mobile:      s.mobile,
+      normalizedMobile: normalizeMobile(s.mobile),
       preparation: s.preparation || 'General',
       duration:    s.duration    || '1 Month(s)',
       joiningDate: s.joiningDate,
@@ -397,32 +595,29 @@ app.post('/api/v1/students', async (req, res) => {
     await upsertSeat(s.seatCode, s.shift, s);
 
     // 3. Generate Receipt PDF
-    const pdfBuffer   = await generatePDFReceipt(s);
-    const senderEmail = process.env.EMAIL_USER || process.env.GMAIL_USER;
+    const pdfBuffer = await generatePDFReceipt(s);
+    const notification = {
+      pdf: { generated: true, bytes: pdfBuffer.length },
+      email: await sendAdmissionEmail(s, pdfBuffer),
+      whatsapp: await sendAdmissionWhatsAppWithStatus(s, pdfBuffer)
+    };
 
-    // 4. Email Dispatch
-    if (s.email && senderEmail) {
-      transporter.sendMail({
-        from:    `Durga Digital Library <${senderEmail}>`,
-        to:      s.email,
-        subject: `Admission Confirmed - Seat ${s.seatCode}`,
-        text:    `Namaste ${s.name},\n\nAapka admission confirm ho gaya hai!\nReceipt PDF attached hai.\n\nThank You!\nDurga Digital Library\nContact: 7424893960`,
-        attachments: [{ filename: `Receipt_${s.seatCode}.pdf`, content: pdfBuffer }]
-      }).catch(err => console.error('Email Sending Error:', err));
-    }
-
-    // 5. WhatsApp Message & Receipt PDF
-    await sendAdmissionWhatsApp(s, pdfBuffer);
-
-    res.status(201).json({ success: true, message: 'Student registered & saved to database successfully!' });
+    res.status(201).json({
+      success: true,
+      message: buildAdmissionResponseMessage(s, notification),
+      notification
+    });
   } catch (err) {
     console.error('❌ DB/Notification Error:', err);
-    res.status(500).json({ success: false, error: err.message });
+    if (err.code === 11000) {
+      return res.status(409).json({ success: false, message: 'Duplicate student or seat assignment detected.' });
+    }
+    res.status(500).json({ success: false, message: 'Unable to register student.' });
   }
 });
 
-// Fetch Student Directory
-app.get('/api/v1/students', async (req, res) => {
+// Fetch Student Directory — admin only
+app.get('/api/v1/students', requireAdmin, async (req, res) => {
   try {
     const studentsList = await Student.find({}).sort({ createdAt: -1 });
     res.json({ students: studentsList });
@@ -431,8 +626,8 @@ app.get('/api/v1/students', async (req, res) => {
   }
 });
 
-// Fetch Seat Grid Matrix
-app.get('/api/v1/seats', async (req, res) => {
+// Fetch Seat Grid Matrix — admin only
+app.get('/api/v1/seats', requireAdmin, async (req, res) => {
   const shift = parseInt(req.query.shift) || 1;
   const seatArray = [];
   try {
@@ -463,7 +658,7 @@ app.get('/api/v1/seats', async (req, res) => {
 // Alerts API (Upcoming Expiring Seats in 5 Days)
 // Normalises field names to match frontend expectations:
 //   frontend reads: a.seat_code, a.expiry_date (snake_case from old SQLite schema)
-app.get('/api/v1/alerts', async (req, res) => {
+app.get('/api/v1/alerts', requireAdmin, async (req, res) => {
   try {
     const today    = new Date();
     const students = await Student.find({});
@@ -492,7 +687,7 @@ app.get('/api/v1/alerts', async (req, res) => {
 });
 
 // Finance Analytics Endpoint
-app.get('/api/v1/finance/stats', async (req, res) => {
+app.get('/api/v1/finance/stats', requireAdmin, async (req, res) => {
   try {
     const allStudents = await Student.find({});
     const today = new Date();
@@ -519,7 +714,7 @@ app.get('/api/v1/finance/stats', async (req, res) => {
 });
 
 // Dynamic UPI Payment Endpoint
-app.get('/api/v1/payment/upi-link', (req, res) => {
+app.get('/api/v1/payment/upi-link', requireAdmin, (req, res) => {
   const { amount, name, seatCode } = req.query;
   const upiId       = process.env.UPI_ID || 'durgadigital@upi';
   const payeeName   = 'Durga Digital Library';
@@ -534,10 +729,19 @@ app.get('/api/v1/payment/upi-link', (req, res) => {
 // -------------------------------------------------------------
 
 // Edit Student (update student record + sync seat matrix)
-app.put('/api/v1/students/:id', async (req, res) => {
+app.put('/api/v1/students/:id', requireAdmin, async (req, res) => {
   try {
     const studentId = req.params.id;
     const s         = req.body;
+    if (!isValidObjectId(studentId)) {
+      return res.status(400).json({ success: false, message: 'Invalid student id.' });
+    }
+    if (s.mobile && !isValidMobile(s.mobile)) {
+      return res.status(400).json({ success: false, message: 'Mobile number is invalid.' });
+    }
+    if (s.email && !isValidEmail(s.email)) {
+      return res.status(400).json({ success: false, message: 'Email address is invalid.' });
+    }
 
     const existing = await Student.findById(studentId);
     if (!existing) {
@@ -549,6 +753,10 @@ app.put('/api/v1/students/:id', async (req, res) => {
 
     // Free old seat if seat or shift changed
     if (newSeatCode !== existing.seatCode || newShift !== existing.shift) {
+      const seatConflict = await findSeatConflict(newSeatCode, newShift, studentId);
+      if (seatConflict.invalid || seatConflict.conflict) {
+        return res.status(seatConflict.invalid ? 400 : 409).json({ success: false, message: seatConflict.message });
+      }
       await freeSeat(existing.seatCode, existing.shift);
     }
 
@@ -558,6 +766,7 @@ app.put('/api/v1/students/:id', async (req, res) => {
       {
         name:        s.name        || existing.name,
         mobile:      s.mobile      || existing.mobile,
+        normalizedMobile: normalizeMobile(s.mobile || existing.mobile),
         email:       s.email       ?? existing.email,
         preparation: s.preparation || existing.preparation,
         shift:       newShift,
@@ -581,14 +790,20 @@ app.put('/api/v1/students/:id', async (req, res) => {
     return res.json({ success: true, message: 'Student updated successfully.', student: updated });
   } catch (err) {
     console.error('❌ Edit Student Error:', err);
-    return res.status(500).json({ success: false, message: err.message });
+    if (err.code === 11000) {
+      return res.status(409).json({ success: false, message: 'Duplicate student or seat assignment detected.' });
+    }
+    return res.status(500).json({ success: false, message: 'Unable to update student.' });
   }
 });
 
 // Delete Student (archive + free seat + remove from active directory)
-app.delete('/api/v1/students/:id', async (req, res) => {
+app.delete('/api/v1/students/:id', requireAdmin, async (req, res) => {
   try {
     const studentId = req.params.id;
+    if (!isValidObjectId(studentId)) {
+      return res.status(400).json({ success: false, message: 'Invalid student id.' });
+    }
     const student   = await Student.findById(studentId);
     if (!student) {
       return res.status(404).json({ success: false, message: 'Student not found.' });
@@ -631,7 +846,7 @@ app.delete('/api/v1/students/:id', async (req, res) => {
 // -------------------------------------------------------------
 
 // Fetch Pending Online Admissions
-app.get('/api/v1/online-admissions', async (req, res) => {
+app.get('/api/v1/online-admissions', requireAdmin, async (req, res) => {
   try {
     const rows = await Inquiry.find({ admission_status: 'Pending' }).sort({ createdAt: -1 });
     return res.json({ success: true, admissions: rows });
@@ -642,11 +857,14 @@ app.get('/api/v1/online-admissions', async (req, res) => {
 });
 
 // Accept Online Admission
-app.post('/api/v1/online-admissions/accept/:id', async (req, res) => {
+app.post('/api/v1/online-admissions/accept/:id', requireAdmin, async (req, res) => {
   try {
     const inquiryId = req.params.id;
-    const inquiry   = await Inquiry.findById(inquiryId);
+    if (!isValidObjectId(inquiryId)) {
+      return res.status(400).json({ success: false, message: 'Invalid inquiry id.' });
+    }
 
+    const inquiry = await Inquiry.findById(inquiryId);
     if (!inquiry) {
       return res.status(404).json({ success: false, message: 'Admission record not found.' });
     }
@@ -659,11 +877,18 @@ app.post('/api/v1/online-admissions/accept/:id', async (req, res) => {
       return res.status(400).json({ success: false, message: 'seatCode, shift, fee, joiningDate and expiryDate are required.' });
     }
 
+    // Validate seat availability before creating student
+    const seatConflict = await findSeatConflict(seatCode, shift);
+    if (seatConflict.invalid || seatConflict.conflict) {
+      return res.status(seatConflict.invalid ? 400 : 409).json({ success: false, message: seatConflict.message });
+    }
+
     const s = {
       seatCode,
       name:        inquiry.name,
       email:       inquiry.email       || '',
       mobile:      inquiry.mobile,
+      normalizedMobile: normalizeMobile(inquiry.mobile),
       preparation: inquiry.preparation || 'General',
       duration:    duration            || '1 Month(s)',
       joiningDate,
@@ -680,39 +905,42 @@ app.post('/api/v1/online-admissions/accept/:id', async (req, res) => {
     await upsertSeat(s.seatCode, s.shift, s);
 
     // 3. Generate PDF Receipt
-    const pdfBuffer   = await generatePDFReceipt(s);
-    const senderEmail = process.env.EMAIL_USER || process.env.GMAIL_USER;
+    const pdfBuffer = await generatePDFReceipt(s);
 
-    // 4. Send Email Receipt
-    if (s.email && senderEmail) {
-      transporter.sendMail({
-        from:    `Durga Digital Library <${senderEmail}>`,
-        to:      s.email,
-        subject: `Admission Confirmed - Seat ${s.seatCode}`,
-        text:    `Namaste ${s.name},\n\nAapka admission confirm ho gaya hai!\nReceipt PDF attached hai.\n\nThank You!\nDurga Digital Library\nContact: 7424893960`,
-        attachments: [{ filename: `Receipt_${s.seatCode}.pdf`, content: pdfBuffer }]
-      }).catch(err => console.error('Email Sending Error:', err));
-    }
+    // 4. Send Email + WhatsApp using status-reporting helpers (failures don't abort)
+    const notification = {
+      pdf:      { generated: true, bytes: pdfBuffer.length },
+      email:    await sendAdmissionEmail(s, pdfBuffer),
+      whatsapp: await sendAdmissionWhatsAppWithStatus(s, pdfBuffer)
+    };
 
-    // 5. Send WhatsApp Message + PDF
-    await sendAdmissionWhatsApp(s, pdfBuffer);
-
-    // 6. Mark inquiry as Accepted
+    // 5. Mark inquiry as Accepted
     await Inquiry.findByIdAndUpdate(inquiryId, { admission_status: 'Accepted', payment_status: 'Paid' });
 
     console.log(`✅ Online Admission Accepted: ${s.name} → Seat ${s.seatCode}`);
-    return res.status(201).json({ success: true, message: `Admission accepted for ${s.name}. WhatsApp, Email & PDF sent.` });
+    return res.status(201).json({
+      success: true,
+      message: buildAdmissionResponseMessage(s, notification),
+      notification
+    });
   } catch (err) {
     console.error('❌ Accept Admission Error:', err);
+    if (err.code === 11000) {
+      return res.status(409).json({ success: false, message: 'Seat already allocated to another student.' });
+    }
     return res.status(500).json({ success: false, message: err.message });
   }
 });
 
 // Reject Online Admission
-app.post('/api/v1/online-admissions/reject/:id', async (req, res) => {
+app.post('/api/v1/online-admissions/reject/:id', requireAdmin, async (req, res) => {
   try {
     const inquiryId = req.params.id;
-    const inquiry   = await Inquiry.findById(inquiryId);
+    if (!isValidObjectId(inquiryId)) {
+      return res.status(400).json({ success: false, message: 'Invalid inquiry id.' });
+    }
+
+    const inquiry = await Inquiry.findById(inquiryId);
 
     if (!inquiry) {
       return res.status(404).json({ success: false, message: 'Admission record not found.' });
@@ -754,6 +982,12 @@ cron.schedule('0 9 * * *', async () => {
   } catch (err) {
     console.error('Cron Error:', err);
   }
+});
+
+// 404 handler for /api/v1/* — must come before the SPA catch-all
+// Without this, Express 5 app.use() fallback serves HTML for unknown API paths
+app.use('/api/v1', (req, res) => {
+  res.status(404).json({ success: false, message: `API route not found: ${req.method} ${req.originalUrl}` });
 });
 
 // Serve Single Page Web App Index
