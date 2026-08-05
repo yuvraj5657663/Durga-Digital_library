@@ -848,29 +848,27 @@ app.post('/api/v1/online-admissions', async (req, res) => {
   try {
     const data = req.body;
 
-    const admission = new OnlineAdmission({
-      name: data.name,
-      mobile: data.mobile,
-      email: data.email,
-      course: data.course || '',
-      shift: data.shift || data.preferred_shift || '',
+    const admission = await Inquiry.create({
+      name: data.name || '',
+      mobile: data.mobile || '',
+      email: data.email || '',
+      preparation: data.course || data.preparation || '',
+      preferred_shift: data.shift || data.preferred_shift || '',
       address: data.address || '',
-      status: 'pending',
+      admission_status: 'Pending',
       source: 'google_form'
     });
 
-    await admission.save();
-
     console.log(`📥 New Online Admission: ${admission.name} (${admission.mobile})`);
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       message: 'Online admission submitted successfully',
       admission
     });
   } catch (error) {
     console.error('Online admission save error:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: error.message
     });
