@@ -844,7 +844,38 @@ app.delete('/api/v1/students/:id', requireAdmin, async (req, res) => {
 // -------------------------------------------------------------
 // 3-C. ONLINE ADMISSIONS: View Pending / Accept / Reject
 // -------------------------------------------------------------
+app.post('/api/v1/online-admissions', async (req, res) => {
+  try {
+    const data = req.body;
 
+    const admission = new OnlineAdmission({
+      name: data.name,
+      mobile: data.mobile,
+      email: data.email,
+      course: data.course || '',
+      shift: data.shift || data.preferred_shift || '',
+      address: data.address || '',
+      status: 'pending',
+      source: 'google_form'
+    });
+
+    await admission.save();
+
+    console.log(`📥 New Online Admission: ${admission.name} (${admission.mobile})`);
+
+    res.status(201).json({
+      success: true,
+      message: 'Online admission submitted successfully',
+      admission
+    });
+  } catch (error) {
+    console.error('Online admission save error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+});
 // Fetch Pending Online Admissions
 app.get('/api/v1/online-admissions', requireAdmin, async (req, res) => {
   try {
