@@ -228,7 +228,7 @@ function generatePDFReceipt(student) {
       doc.font('Helvetica').fontSize(6).fillColor('#bcd0e8')
         .text('Kalarampur, Near Shiv Mandir, NH-80, Munger - 811211', textX, logoY + 14, { width: textW });
       doc.font('Helvetica-Bold').fontSize(6.5).fillColor('#ffffff')
-        .text('Contact: Saurav Kumar (7424893960)', textX, logoY + 23, { width: textW });
+        .text('Contact: Saurav Kumar (7542893960)', textX, logoY + 23, { width: textW });
 
       const subStripY = headerHeight;
       doc.rect(0, subStripY, PAGE_W, 18).fill('#ebf4ff');
@@ -307,10 +307,10 @@ function generatePDFReceipt(student) {
 
 // Helper: build WhatsApp admission message (reused by manual + online-admission accept)
 function buildAdmissionWaMessage(s) {
-  const inquiryLink = process.env.INQUIRY_LINK || 'https://forms.gle/YOUR_LINK';
+  const inquiryLink = process.env.INQUIRY_LINK || 'https://forms.gle/evXNjDReA8Za7PgN9';
   return `*DURGA DIGITAL LIBRARY, MUNGER* 📚
 📍 *Location:* Kalarampur, Near Shiv Mandir, NH-80, Munger - 811211
-📞 *Contact Person:* Saurav Kumar (7424893960)
+📞 *Contact Person:* Saurav Kumar (7542893960)
 
 Namaste *${s.name}*,
 Aapka admission successfully confirm ho gaya hai!

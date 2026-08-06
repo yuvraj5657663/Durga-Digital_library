@@ -133,17 +133,18 @@ document.getElementById("logout-btn")?.addEventListener("click", () => {
 });
 
 function showDashboard() {
-  document.getElementById("login-screen")?.classList.remove("active");
-  document.getElementById("dashboard-screen")?.classList.add("active");
+  document.getElementById('login-screen')?.classList.remove('active');
+  document.getElementById('dashboard-screen')?.classList.add('active');
 
-  if (document.getElementById("adm-joining")) {
-    document.getElementById("adm-joining").valueAsDate = new Date();
+  if (document.getElementById('adm-joining')) {
+    document.getElementById('adm-joining').valueAsDate = new Date();
   }
   calculateExpiryAndFee();
   loadSeatMatrix();
-  loadStudentDirectory(); 
+  loadStudentDirectory();
   loadInquiriesDirectory(); // Load inquiries from Google Forms
   loadOnlineAdmissions();   // Load pending online admissions
+  startOnlineAdmissionsAutoRefresh();
   loadAppConfig();          // Load public server config (inquiry link, UPI id)
 }
 
@@ -171,15 +172,15 @@ document.querySelectorAll(".nav-link").forEach(btn => {
     const target = document.getElementById(btn.dataset.tab);
     if (target) target.classList.add("active");
 
-    if (btn.dataset.tab === "seats-tab") loadSeatMatrix();
-    if (btn.dataset.tab === "students-tab") loadStudentDirectory();
-    if (btn.dataset.tab === "inquiries-tab") loadInquiriesDirectory();
-    if (btn.dataset.tab === "alerts-tab") loadAlerts();
-    if (btn.dataset.tab === "online-admissions-tab") loadOnlineAdmissions();
+    if (btn.dataset.tab === 'seats-tab') loadSeatMatrix();
+    if (btn.dataset.tab === 'students-tab') loadStudentDirectory();
+    if (btn.dataset.tab === 'inquiries-tab') loadInquiriesDirectory();
+    if (btn.dataset.tab === 'alerts-tab') loadAlerts();
+    if (btn.dataset.tab === 'online-admissions-tab') loadOnlineAdmissions();
 
     // Auto generate random seat code if clicking New Admission directly
-    if (btn.dataset.tab === "admission-tab") {
-      const seatInput = document.getElementById("adm-seat");
+    if (btn.dataset.tab === 'admission-tab') {
+      const seatInput = document.getElementById('adm-seat');
       if (seatInput && !seatInput.value) {
         seatInput.value = generateRandomSeatCode();
       }
@@ -803,70 +804,132 @@ async function deleteStudent(id, name) {
 
 // In-memory store for pending online admissions
 let onlineAdmissions = [];
+let isOnlineAdmissionsLoading = false;
+let onlineAdmissionsAutoRefreshInterval = null;
+const ONLINE_ADMISSIONS_AUTO_REFRESH_MS = 15000;
 
 async function loadOnlineAdmissions() {
+  if (!token) {
+    onlineAdmissions = [];
+    renderOnlineAdmissions();
+    return;
+  }
+
+  isOnlineAdmissionsLoading = true;
+  renderOnlineAdmissions();
+
   try {
-    const res = await fetch(`${API}/online-admissions`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    const data = await res.json();
-    if (data.success) {
-      onlineAdmissions = data.admissions || [];
-      renderOnlineAdmissions();
-    }
+    onlineAdmissions = await window.admissionsApi.getOnlineAdmissions();
   } catch (err) {
-    console.error("Failed to load online admissions:", err);
+    console.error('Failed to load online admissions:', err);
+    onlineAdmissions = [];
+  } finally {
+    isOnlineAdmissionsLoading = false;
+    renderOnlineAdmissions();
+  }
+}
+
+async function handleAcceptAdmission(id, payload) {
+  const acceptButton = document.querySelector('#accept-admission-form button[type="submit"]');
+  if (acceptButton) {
+    acceptButton.disabled = true;
+    acceptButton.innerText = 'Processing…';
+  }
+
+  try {
+    const data = await window.admissionsApi.acceptAdmission(id, payload);
+    onlineAdmissions = onlineAdmissions.filter(admission => (admission._id || admission.id) !== id);
+    renderOnlineAdmissions();
+    closeAcceptModal();
+    await loadOnlineAdmissions();
+    await loadStudentDirectory();
+    await loadSeatMatrix();
+    alert(`✅ ${data.message}`);
+  } catch (err) {
+    console.error('Accept admission error:', err);
+    alert(`❌ Accept failed: ${err.message || 'Server connection error while accepting admission.'}`);
+  } finally {
+    if (acceptButton) {
+      acceptButton.disabled = false;
+      acceptButton.innerText = '✅ Confirm Admission';
+    }
+  }
+}
+
+async function handleRejectAdmission(id, name) {
+  const button = document.querySelector(`button[onclick="rejectOnlineAdmission('${id}', '${(name || '').replace(/'/g, "\\'")}')"]`);
+  if (button) button.disabled = true;
+
+  try {
+    const data = await window.admissionsApi.rejectAdmission(id);
+    onlineAdmissions = onlineAdmissions.filter(admission => (admission._id || admission.id) !== id);
+    renderOnlineAdmissions();
+    await loadOnlineAdmissions();
+    alert(`✅ ${data.message}`);
+  } catch (err) {
+    console.error('Reject admission error:', err);
+    alert(`❌ Reject failed: ${err.message || 'Server connection error while rejecting admission.'}`);
+  } finally {
+    if (button) button.disabled = false;
   }
 }
 
 function renderOnlineAdmissions() {
-  const tbody = document.getElementById("online-admissions-table-body");
+  const tbody = document.getElementById('online-admissions-table-body');
   if (!tbody) return;
+
+  if (isOnlineAdmissionsLoading) {
+    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:2rem; color:var(--text-faint);">Loading pending online admissions…</td></tr>`;
+    return;
+  }
 
   if (!onlineAdmissions || onlineAdmissions.length === 0) {
     tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:2rem; color:var(--text-faint);">No pending online admissions.</td></tr>`;
     return;
   }
 
-  tbody.innerHTML = onlineAdmissions.map(a => `
-    <tr>
-      <td><strong>${a.name || 'N/A'}</strong></td>
-      <td>${a.father_name || '—'}</td>
-      <td>${a.mobile || 'N/A'}</td>
-      <td style="max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${a.email || 'N/A'}</td>
-      <td>
-        <span style="display:inline-block; padding:3px 10px; font-size:0.75rem; font-weight:600; border-radius:12px; background:#e0e7ff; color:#3730a3; white-space:nowrap;">
-          ${a.preparation || 'N/A'}
-        </span>
-      </td>
-      <td>${a.preferred_shift || 'N/A'}</td>
-      <td>
-        <span style="display:inline-block; padding:3px 10px; font-size:0.75rem; font-weight:600; border-radius:12px;
-          background:${a.payment_status === 'Paid' ? '#dcfce7' : '#fff7ed'};
-          color:${a.payment_status === 'Paid' ? '#15803d' : '#c2410c'};">
-          ${a.payment_status || 'Pending'}
-        </span>
-      </td>
-      <td>
-        <span style="display:inline-block; padding:3px 10px; font-size:0.75rem; font-weight:600; border-radius:12px; background:#fef9c3; color:#854d0e;">
-          ${a.admission_status || 'Pending'}
-        </span>
-      </td>
-      <td>${a.created_at ? new Date(a.created_at).toLocaleDateString('en-IN') : 'N/A'}</td>
-      <td style="white-space:nowrap;">
-        <button
-          onclick="openAcceptModal(${a.id}, '${(a.name || '').replace(/'/g, "\\'")}', '${(a.mobile || '').replace(/'/g, "\\'")}')"
-          style="padding:4px 11px; font-size:0.78rem; font-weight:600; border-radius:5px; border:1px solid #059669; background:#ecfdf5; color:#047857; cursor:pointer; margin-right:4px;">
-          ✅ Accept
-        </button>
-        <button
-          onclick="rejectOnlineAdmission(${a.id}, '${(a.name || '').replace(/'/g, "\\'")}')"
-          style="padding:4px 11px; font-size:0.78rem; font-weight:600; border-radius:5px; border:1px solid #dc2626; background:#fff1f2; color:#dc2626; cursor:pointer;">
-          ❌ Reject
-        </button>
-      </td>
-    </tr>
-  `).join("");
+  tbody.innerHTML = onlineAdmissions.map(a => {
+    const inquiryId = a.id || a._id || '';
+    const safeName = (a.name || '').replace(/'/g, "\\'");
+    const safeMobile = (a.mobile || '').replace(/'/g, "\\'");
+    return `
+      <tr>
+        <td><strong>${a.name || 'N/A'}</strong></td>
+        <td>${a.father_name || '—'}</td>
+        <td>${a.mobile || 'N/A'}</td>
+        <td style="max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${a.email || 'N/A'}</td>
+        <td>
+          <span style="display:inline-block; padding:3px 10px; font-size:0.75rem; font-weight:600; border-radius:12px; background:#e0e7ff; color:#3730a3; white-space:nowrap;">
+            ${a.preparation || 'N/A'}
+          </span>
+        </td>
+        <td>${a.preferred_shift || 'N/A'}</td>
+        <td>
+          <span style="display:inline-block; padding:3px 10px; font-size:0.75rem; font-weight:600; border-radius:12px; background:${a.payment_status === 'Paid' ? '#dcfce7' : '#fff7ed'}; color:${a.payment_status === 'Paid' ? '#15803d' : '#c2410c'};">
+            ${a.payment_status || 'Pending'}
+          </span>
+        </td>
+        <td>
+          <span style="display:inline-block; padding:3px 10px; font-size:0.75rem; font-weight:600; border-radius:12px; background:#fef9c3; color:#854d0e;">
+            ${a.admission_status || 'Pending'}
+          </span>
+        </td>
+        <td>${a.created_at ? new Date(a.created_at).toLocaleDateString('en-IN') : 'N/A'}</td>
+        <td style="white-space:nowrap;">
+          <button
+            onclick="openAcceptModal('${inquiryId}', '${safeName}', '${safeMobile}')"
+            style="padding:4px 11px; font-size:0.78rem; font-weight:600; border-radius:5px; border:1px solid #059669; background:#ecfdf5; color:#047857; cursor:pointer; margin-right:4px;">
+            ✅ Accept
+          </button>
+          <button
+            onclick="rejectOnlineAdmission('${inquiryId}', '${safeName}')"
+            style="padding:4px 11px; font-size:0.78rem; font-weight:600; border-radius:5px; border:1px solid #dc2626; background:#fff1f2; color:#dc2626; cursor:pointer;">
+            ❌ Reject
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
 }
 
 
@@ -903,12 +966,28 @@ function closeAcceptModal() {
 }
 
 // Close accept modal on backdrop click
-document.getElementById("accept-admission-modal")?.addEventListener("click", (e) => {
-  if (e.target.id === "accept-admission-modal") closeAcceptModal();
+document.getElementById('accept-admission-modal')?.addEventListener('click', (e) => {
+  if (e.target.id === 'accept-admission-modal') closeAcceptModal();
 });
 
+function startOnlineAdmissionsAutoRefresh() {
+  stopOnlineAdmissionsAutoRefresh();
+  onlineAdmissionsAutoRefreshInterval = setInterval(() => {
+    if (document.getElementById('online-admissions-tab')?.classList.contains('active')) {
+      loadOnlineAdmissions();
+    }
+  }, ONLINE_ADMISSIONS_AUTO_REFRESH_MS);
+}
+
+function stopOnlineAdmissionsAutoRefresh() {
+  if (onlineAdmissionsAutoRefreshInterval) {
+    clearInterval(onlineAdmissionsAutoRefreshInterval);
+    onlineAdmissionsAutoRefreshInterval = null;
+  }
+}
+
 // Auto-update shift hours & fee when shift changes in accept modal
-document.getElementById("accept-shift")?.addEventListener("change", () => {
+document.getElementById('accept-shift')?.addEventListener('change', () => {
   const shiftVal = document.getElementById("accept-shift").value;
   const shiftNum = parseInt(shiftVal.replace(/[^0-9]/g, '')) || 1;
   if (SHIFT_DEFAULTS[shiftNum]) {
@@ -959,29 +1038,7 @@ document.getElementById("accept-admission-form")?.addEventListener("submit", asy
   };
 
   try {
-    const res = await fetch(`${API}/online-admissions/accept/${id}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`
-      },
-      body: JSON.stringify(payload)
-    });
-    const data = await res.json();
-
-    if (data.success) {
-      closeAcceptModal();
-      // Refresh all four views that are affected
-      await loadOnlineAdmissions(); // Remove from pending list
-      await loadStudentDirectory(); // Add to student directory
-      await loadSeatMatrix();       // Mark seat as booked
-      alert(`✅ ${data.message}`);
-    } else {
-      alert(`❌ Accept failed: ${data.message || "Unknown error"}`);
-    }
-  } catch (err) {
-    console.error("Accept admission error:", err);
-    alert("❌ Server connection error while accepting admission.");
+    await handleAcceptAdmission(id, payload);
   } finally {
     isSubmittingAccept = false;
     if (btn) { btn.disabled = false; btn.innerText = "✅ Confirm Admission"; }
@@ -994,23 +1051,5 @@ document.getElementById("accept-admission-form")?.addEventListener("submit", asy
 // =============================================================
 
 async function rejectOnlineAdmission(id, name) {
-  if (!confirm(`Reject admission for "${name}"?\n\nNo seat will be allocated and no receipt will be sent.`)) return;
-
-  try {
-    const res = await fetch(`${API}/online-admissions/reject/${id}`, {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${token}` }
-    });
-    const data = await res.json();
-
-    if (data.success) {
-      await loadOnlineAdmissions(); // Remove from pending list
-      alert(`✅ ${data.message}`);
-    } else {
-      alert(`❌ Reject failed: ${data.message || "Unknown error"}`);
-    }
-  } catch (err) {
-    console.error("Reject admission error:", err);
-    alert("❌ Server connection error while rejecting admission.");
-  }
+  await handleRejectAdmission(id, name);
 }
