@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: durga-library-server
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://mongodb:27017/durga-library
+      - JWT_SECRET=${JWT_SECRET}
+      - EMAIL_USER=${EMAIL_USER}
+      - EMAIL_PASS=${EMAIL_PASS}
+      - ALLOWED_ORIGINS=http://localhost:80
+    depends_on:
+      - mongodb
+    volumes:
+      - ./server/logs:/app/logs
+      - ./server/uploads:/app/uploads
+    restart: unless-stopped
+    networks:
+      - durga-network
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: durga-library-client
+    ports:
+      - "80:80"
+    depends_on:
+      - server
+    restart: unless-stopped
+    networks:
+      - durga-network
+
+  mongodb:
+    image: mongo:7
+    container_name: durga-library-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb-data:/data/db
+    restart: unless-stopped
+    networks:
+      - durga-network
+
+volumes:
+  mongodb-data:
+
+networks:
+  durga-network:
+    driver: bridge

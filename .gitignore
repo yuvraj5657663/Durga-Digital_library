@@ -3,5 +3,10 @@ node_modules/
 .wwebjs_cache/
 *.db
 .env
-.env.example
+.env.local
+.env.*.local
 Durga-Digital_library/
+logs/
+uploads/
+dist/
+coverage/
