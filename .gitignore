@@ -10,3 +10,4 @@ logs/
 uploads/
 dist/
 coverage/
+k6.exe
