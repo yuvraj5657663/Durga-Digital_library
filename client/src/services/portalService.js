@@ -34,6 +34,11 @@ export const portalService = {
     return response.data;
   },
 
+  selfCheckIn: async () => {
+    const response = await api.post('/student/attendance/check-in');
+    return response.data.data;
+  },
+
   getPayments: async (params = {}) => {
     const response = await api.get('/student/payments', { params });
     return response.data;

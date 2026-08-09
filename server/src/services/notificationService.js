@@ -2,6 +2,7 @@ import nodemailer from 'nodemailer';
 import Notification from '../models/Notification.js';
 import config from '../config/index.js';
 import logger from '../config/logger.js';
+import { generateAdmissionReceipt } from './pdfService.js';
 
 const transporter = nodemailer.createTransport({
   service: 'gmail',
@@ -59,7 +60,8 @@ export async function send(opts = {}) {
     email, mobile,
     metadata = {},
     expiresAt = null,
-    attachments = []
+    attachments = [],
+    studentData = null
   } = opts;
 
   const notif = await Notification.create({
@@ -75,8 +77,30 @@ export async function send(opts = {}) {
 
   const sentVia = { email: false, whatsapp: false };
 
+  // Generate PDF receipt for student creation
+  let receiptAttachment = null;
+  if (type === 'membership_activated' && studentData) {
+    try {
+      const receiptBuffer = await generateAdmissionReceipt({
+        student: studentData,
+        payment: { receiptNo: metadata.receiptNo, amount: studentData.fee, paidOn: studentData.joiningDate }
+      });
+      receiptAttachment = {
+        filename: `Receipt_${studentData.seatCode}.pdf`,
+        content: receiptBuffer,
+        contentType: 'application/pdf'
+      };
+    } catch (err) {
+      logger.error('[notificationService] PDF generation error:', err.message);
+    }
+  }
+
   if (channel === 'email' || channel === 'all') {
-    const result = await sendEmail({ to: email, subject: title, text: body, attachments });
+    const emailAttachments = [...attachments];
+    if (receiptAttachment) {
+      emailAttachments.push(receiptAttachment);
+    }
+    const result = await sendEmail({ to: email, subject: title, text: body, attachments: emailAttachments });
     sentVia.email = result.sent;
     await Notification.updateOne({ _id: notif._id }, { 'sentVia.email': result.sent });
   }
@@ -106,8 +130,34 @@ export async function sendRenewalReminder({ student, daysLeft }) {
 }
 
 export async function sendMembershipActivated({ student, membership }) {
-  const title = '✅ Membership Activated';
-  const body = `Namaste ${student.name},\n\nAapki library membership successfully activate ho gayi hai!\n\nSeat: ${student.seatCode}\nShift: ${student.shift}\nValid Until: ${membership.expiryDate}\n\nDurga Digital Library`;
+  const title = '✅ Admission Confirmed';
+  const body = `DURGA DIGITAL LIBRARY, MUNGER 📚
+📍 Location: Kalarampur, Near Shiv Mandir, NH-80, Munger - 811211
+📞 Contact Person: Saurav Kumar (7424893960)
+
+Namaste ${student.name},
+Aapka admission successfully confirm ho gaya hai!
+
+📌 Seat Code: ${student.seatCode}
+⏰ Shift: ${student.shift}
+📅 Joining Date: ${student.joiningDate}
+⏳ Expiry Date: ${student.expiryDate}
+💰 Fee Paid: ₹${student.fee}
+
+----------------------------------------
+🌟 Facilities Available:
+✔️ 24/7 Open Library
+✔️ 🎥 24x7 CCTV Camera Surveillance
+✔️ 🧼 Clean & Separate Washrooms
+✔️ 💧 RO Mineral Water
+✔️ 🌐 High-Speed Free Wi-Fi
+✔️ ❄️ Fully Air-Conditioned (AC)
+✔️ ⚡ Uninterrupted Power Backup
+
+🤝 Share & Admission Inquiry Link:
+👉 https://forms.gle/HgSDtMLqnCZgreBe8
+
+Aapki Fee Receipt PDF neeche attached hai. Thank you!`;
 
   return send({
     recipient: student._id,
@@ -116,7 +166,8 @@ export async function sendMembershipActivated({ student, membership }) {
     body,
     channel: 'all',
     email: student.email,
-    mobile: student.mobile
+    mobile: student.mobile,
+    studentData: student
   });
 }
 

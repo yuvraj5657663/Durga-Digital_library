@@ -1,20 +1,37 @@
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import mongoose from 'mongoose';
+import { v4 as uuidv4 } from 'uuid';
 import AdmissionRequest from '../models/AdmissionRequest.js';
 import User from '../models/User.js';
 import Student from '../models/Student.js';
 import AuditLog from '../models/AuditLog.js';
 import Membership from '../models/Membership.js';
+import Payment from '../models/Payment.js';
 import Seat from '../models/Seat.js';
 import { successResponse, paginatedResponse } from '../utils/response.js';
 import { asyncHandler } from '../utils/errors.js';
 import { ValidationError, NotFoundError } from '../utils/errors.js';
-import { sendMembershipActivated } from '../services/notificationService.js';
-import { generateRenewalReceipt } from '../services/pdfService.js';
+import { send as sendNotif } from '../services/notificationService.js';
+import { toActorId } from '../utils/actorId.js';
+import { toDataURL } from '../services/qrService.js';
+import config from '../config/index.js';
 import logger from '../config/logger.js';
 
 const PASSWORD_SALT_ROUNDS = parseInt(process.env.PASSWORD_SALT_ROUNDS || '10', 10);
+
+function generateStudentId() {
+  const year = new Date().getFullYear();
+  const rnd  = uuidv4().replace(/-/g, '').toUpperCase().slice(0, 6);
+  return `DDL-${year}-${rnd}`;
+}
+
+function generateReceiptNo() {
+  const d   = new Date();
+  const ymd = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+  const rnd = uuidv4().replace(/-/g, '').toUpperCase().slice(0, 6);
+  return `DDL-${ymd}-${rnd}`;
+}
 
 function normalizeField(value) {
   return value == null ? '' : String(value).trim();
@@ -134,14 +151,12 @@ export const getAdmissionRequestsController = asyncHandler(async (req, res) => {
 });
 
 export const approveAdmissionRequestController = asyncHandler(async (req, res) => {
-  const requestId = req.params.id;
+  const requestId      = req.params.id;
   const approvalDetails = req.body;
-  const adminUser = req.user;
+  const adminUser      = req.user;
 
   const admissionRequest = await AdmissionRequest.findById(requestId);
-  if (!admissionRequest) {
-    throw new NotFoundError('Admission request not found');
-  }
+  if (!admissionRequest) throw new NotFoundError('Admission request not found');
   if (admissionRequest.admission_status !== 'Pending') {
     throw new ValidationError(`Admission request already ${admissionRequest.admission_status}`);
   }
@@ -151,112 +166,160 @@ export const approveAdmissionRequestController = asyncHandler(async (req, res) =
     throw new ValidationError('seatCode, shift, fee, joiningDate and expiryDate are required for approval');
   }
 
+  // Generate studentId + QR before transaction
+  let studentId = generateStudentId();
+  while (await Student.findOne({ studentId }).lean()) studentId = generateStudentId();
+  const qrDataUrl  = await toDataURL(
+    `${config.app.url || 'http://localhost:3000'}/portal?student=${studentId}`,
+    { width: 300 }
+  );
+  const receiptNo  = generateReceiptNo();
+  const password   = crypto.randomBytes(6).toString('hex');
+  const passwordHash = await bcrypt.hash(password, PASSWORD_SALT_ROUNDS);
+
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
     const studentData = {
       seatCode,
-      name: admissionRequest.name,
-      email: admissionRequest.email || '',
-      mobile: admissionRequest.mobile,
+      studentId,
+      qrCodeUrl:       qrDataUrl,
+      name:            admissionRequest.name,
+      email:           admissionRequest.email || '',
+      mobile:          admissionRequest.mobile,
       normalizedMobile: normalizeMobile(admissionRequest.mobile),
-      preparation: admissionRequest.preparation || 'General',
-      duration: duration || '1 Month(s)',
+      preparation:     admissionRequest.preparation || 'General',
+      duration:        duration || '1 Month(s)',
       joiningDate,
       expiryDate,
-      fee: parseFloat(fee),
+      fee:             parseFloat(fee),
       shift,
-      shiftHours: shiftHours || ''
+      shiftHours:      shiftHours || '',
+      status:          'Active'
     };
 
-    const student = await Student.create([studentData], { session });
-    const createdStudent = student[0];
+    const [createdStudent] = await Student.create([studentData], { session });
 
+    // Upsert seat
+    const shiftNum = parseInt(String(shift).replace(/[^0-9]/g, '')) || 1;
     await Seat.findOneAndUpdate(
-      { seat_key: `${seatCode}_shift_${shift}` },
+      { seat_key: `s_${parseInt(seatCode.replace(/\D/g, ''), 10)}_shift_${shiftNum}` },
       {
-        seat_key: `${seatCode}_shift_${shift}`,
-        seat_number: parseInt(seatCode.replace(/\D/g, '')),
-        shift: parseInt(shift),
-        is_booked: 1,
-        student_name: studentData.name,
-        mobile: studentData.mobile,
-        preparation: studentData.preparation,
+        seat_key:    `s_${parseInt(seatCode.replace(/\D/g, ''), 10)}_shift_${shiftNum}`,
+        seat_number: parseInt(seatCode.replace(/\D/g, ''), 10),
+        shift:       shiftNum,
+        is_booked:   1,
+        student_name:admissionRequest.name,
+        mobile:      admissionRequest.mobile,
+        preparation: admissionRequest.preparation || '',
         expiry_date: expiryDate
       },
       { upsert: true, session }
     );
 
-    const password = crypto.randomBytes(5).toString('hex');
-    const passwordHash = await bcrypt.hash(password, PASSWORD_SALT_ROUNDS);
-
-    const user = await User.create([{
-      name: admissionRequest.name,
-      email: admissionRequest.email || '',
+    // Create User account
+    const emailForUser = admissionRequest.email || `${studentId.toLowerCase()}@ddl.local`;
+    const [user] = await User.create([{
+      name:             admissionRequest.name,
+      email:            emailForUser,
+      username:         studentId.toLowerCase(),
       passwordHash,
-      role: 'student',
-      mobile: admissionRequest.mobile,
+      role:             'student',
+      mobile:           admissionRequest.mobile,
       normalizedMobile: normalizeMobile(admissionRequest.mobile),
-      studentRef: createdStudent._id
+      studentRef:       createdStudent._id
     }], { session });
 
-    const membership = await Membership.create([{
-      student: createdStudent._id,
-      type: 'Standard',
-      status: 'Active',
-      startDate: joiningDate,
+    await Student.findByIdAndUpdate(createdStudent._id, { userRef: user._id }, { session });
+
+    // Create Membership
+    const [membership] = await Membership.create([{
+      student:     createdStudent._id,
+      type:        'Standard',
+      status:      'Active',
+      startDate:   joiningDate,
       expiryDate,
-      fee: parseFloat(fee),
-      duration: duration || '1 Month(s)',
-      activatedBy: adminUser.id
+      fee:         parseFloat(fee),
+      duration:    duration || '1 Month(s)',
+      activatedBy: toActorId(adminUser.id)
     }], { session });
 
+    // Create Payment
+    await Payment.create([{
+      student:    createdStudent._id,
+      membership: membership._id,
+      receiptNo,
+      type:       'admission',
+      amount:     parseFloat(fee),
+      mode:       'cash',
+      status:     'completed',
+      paidOn:     joiningDate,
+      collectedBy:toActorId(adminUser.id)
+    }], { session });
+
+    // Update AdmissionRequest
     await AdmissionRequest.findByIdAndUpdate(
       admissionRequest._id,
       {
         admission_status: 'Accepted',
-        payment_status: 'Paid',
-        reviewer: adminUser.id,
-        reviewerName: adminUser.username,
-        reviewNotes: approvalDetails.reviewNotes || '',
-        studentRef: createdStudent._id
+        payment_status:   'Paid',
+        reviewer:         toActorId(adminUser.id),
+        reviewerName:     adminUser.username,
+        reviewNotes:      approvalDetails.reviewNotes || '',
+        studentRef:       createdStudent._id
       },
       { session }
     );
 
     await AuditLog.create([{
-      action: 'admission_request_approved',
-      actorId: adminUser.id,
+      action:    'admission_request_approved',
+      actorId:   toActorId(adminUser.id),
       actorRole: adminUser.role,
       actorName: adminUser.username,
-      targetType: 'AdmissionRequest',
-      targetId: admissionRequest._id.toString(),
-      targetName: admissionRequest.name,
-      details: {
-        studentId: createdStudent._id.toString(),
-        userId: user[0]._id.toString(),
-        membershipId: membership[0]._id.toString(),
-        seatCode,
-        shift,
-        generatedPassword: 'generated'
-      },
-      ip: req.ip,
+      targetType:'AdmissionRequest',
+      targetId:  admissionRequest._id.toString(),
+      targetName:admissionRequest.name,
+      details:   { studentId, receiptNo, seatCode, shift },
+      ip:        req.ip,
       userAgent: req.headers['user-agent'] || ''
     }], { session });
 
     await session.commitTransaction();
     session.endSession();
 
-    sendMembershipActivated({ student: createdStudent, membership: membership[0] }).catch(err =>
-      logger.error('[admission] notification error:', err.message)
-    );
+    // Post-commit notifications (non-blocking)
+    const credMsg =
+      `*DURGA DIGITAL LIBRARY — Admission Approved!* 📚\n\n` +
+      `Namaste *${admissionRequest.name}*,\n\n` +
+      `Aapka admission confirm ho gaya hai! 🎉\n\n` +
+      `*Student Portal Login Credentials:*\n` +
+      `🆔 Student ID / Username: *${studentId}*\n` +
+      `🔑 Password: *${password}*\n\n` +
+      `📌 Seat: ${seatCode} | Shift: ${shift}\n` +
+      `📅 Valid Until: ${expiryDate}\n\n` +
+      `Portal: ${config.app.url || 'http://localhost:5173'}/student\n\n` +
+      `Durga Digital Library, Munger\nContact: 7542893960`;
+
+    sendNotif({
+      recipient: createdStudent._id,
+      type:      'membership_activated',
+      title:     'Admission Approved — Login Credentials',
+      body:      credMsg,
+      channel:   'all',
+      email:     admissionRequest.email,
+      mobile:    admissionRequest.mobile,
+      metadata:  { studentId, password, receiptNo }
+    }).catch(e => logger.error('[approveAdmission] notif failed:', e.message));
 
     return successResponse(res, {
-      student: createdStudent,
-      user: { ...user[0].toObject(), password },
-      membership: membership[0]
-    }, 'Admission approved successfully');
+      student:     createdStudent,
+      user:        { id: user._id, username: user.username, email: user.email, role: user.role },
+      membership,
+      receiptNo,
+      credentials: { studentId, password, username: studentId.toLowerCase() }
+    }, 'Admission approved — credentials dispatched');
+
   } catch (err) {
     await session.abortTransaction();
     session.endSession();
@@ -273,7 +336,7 @@ export const rejectAdmissionRequestController = asyncHandler(async (req, res) =>
     requestId,
     {
       admission_status: 'Rejected',
-      reviewer: adminUser.id,
+      reviewer: toActorId(adminUser.id),
       reviewerName: adminUser.username,
       reviewNotes: reviewNotes || ''
     },

@@ -148,21 +148,12 @@ app.use('/api/v1/student', studentPortalRoutes);
 app.use('/api/v1/online-admissions', admissionRoutes);
 app.use('/api/v1/inquiries', inquiryRoutes);
 
-// 404 handler
-app.use(notFoundHandler);
+// 404 — JSON response for unmatched /api/* paths only
+// Non-API paths (e.g. /student, /admin) are React Router client-side routes —
+// they should never reach Express; Vite serves index.html for them in dev.
+app.use('/api', notFoundHandler);
 
-// Error handler
+// Global error handler (must be last)
 app.use(errorHandler);
-
-// Database readiness check middleware
-app.use((req, res, next) => {
-  if (!database.isReady() && req.path.startsWith('/api/v1/') && req.path !== '/api/v1/health') {
-    return res.status(503).json({ 
-      success: false, 
-      message: 'Database connecting, please retry in a moment.' 
-    });
-  }
-  next();
-});
 
 export default app;

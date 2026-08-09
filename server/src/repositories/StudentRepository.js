@@ -6,6 +6,21 @@ class StudentRepository extends BaseRepository {
     super(Student);
   }
 
+  async createStudent(data) {
+    // Normalize mobile number
+    const mobile = String(data.mobile || '').replace(/\D/g, '');
+    const normalizedMobile = mobile.length === 10 ? `91${mobile}` : mobile;
+    
+    const studentData = {
+      ...data,
+      mobile,
+      normalizedMobile,
+      status: 'Active'
+    };
+    
+    return this.create(studentData);
+  }
+
   async findByStudentId(studentId) {
     return this.findOne({ studentId });
   }

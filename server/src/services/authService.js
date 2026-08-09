@@ -20,10 +20,12 @@ function getEnvAdminUser() {
 function signAccessToken(user) {
   return jwt.sign(
     {
-      userId: user._id.toString(),
-      role: user.role,
-      email: user.email,
-      username: user.username
+      userId:     user._id.toString(),
+      role:       user.role,
+      email:      user.email,
+      username:   user.username,
+      // studentRef lets requireStudent middleware resolve the student document
+      studentRef: user.studentRef ? user.studentRef.toString() : undefined
     },
     config.jwt.secret,
     { expiresIn: config.jwt.accessExpires }
@@ -33,10 +35,11 @@ function signAccessToken(user) {
 function signRefreshToken(user) {
   return jwt.sign(
     {
-      userId: user._id.toString(),
-      role: user.role,
-      email: user.email,
-      username: user.username
+      userId:     user._id.toString(),
+      role:       user.role,
+      email:      user.email,
+      username:   user.username,
+      studentRef: user.studentRef ? user.studentRef.toString() : undefined
     },
     config.jwt.secret,
     { expiresIn: config.jwt.refreshExpires }
@@ -83,10 +86,12 @@ export async function login(username, password, ip, userAgent) {
       accessToken,
       refreshToken,
       user: { 
-        id: user._id.toString(), 
-        role: user.role, 
-        username: user.username, 
-        email: user.email 
+        id:         user._id.toString(), 
+        role:       user.role, 
+        username:   user.username, 
+        email:      user.email,
+        studentRef: user.studentRef ? user.studentRef.toString() : undefined,
+        name:       user.name || user.username
       }
     };
   } catch (error) {

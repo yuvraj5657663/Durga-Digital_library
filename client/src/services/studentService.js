@@ -11,6 +11,11 @@ export const studentService = {
     return response.data.data;
   },
 
+  createStudent: async (data) => {
+    const response = await api.post('/admin/students', data);
+    return response.data.data;
+  },
+
   updateStudent: async (id, data) => {
     const response = await api.put(`/admin/students/${id}`, data);
     return response.data.data;

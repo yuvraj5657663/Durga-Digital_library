@@ -4,7 +4,7 @@ const admissionRequestSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true, index: true },
     mobile: { type: String, required: true, trim: true, index: true },
-    normalizedMobile: { type: String, trim: true, index: true, default: '' },
+    normalizedMobile: { type: String, trim: true, default: '' },
     email: { type: String, trim: true, lowercase: true, default: '' },
     preparation: { type: String, trim: true, default: '' },
     preferred_shift: { type: String, trim: true, default: '' },

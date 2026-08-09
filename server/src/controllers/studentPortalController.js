@@ -94,18 +94,68 @@ export const getMembershipController = asyncHandler(async (req, res) => {
 
 export const getAttendanceController = asyncHandler(async (req, res) => {
   const studentId = req.user.studentRef;
-  const { page = 1, limit = 30 } = req.query;
+  const { page = 1, limit = 30, month } = req.query;
 
-  const skip = (page - 1) * limit;
+  const filter = { student: studentId };
+
+  // Support ?month=YYYY-MM filtering
+  if (month) {
+    filter.date = { $regex: `^${month}` };
+  }
+
+  const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
   const [attendance, total] = await Promise.all([
-    Attendance.find({ student: studentId })
+    Attendance.find(filter)
       .sort({ date: -1 })
       .skip(skip)
-      .limit(parseInt(limit)),
-    Attendance.countDocuments({ student: studentId })
+      .limit(parseInt(limit, 10)),
+    Attendance.countDocuments(filter)
   ]);
 
-  return paginatedResponse(res, attendance, { page: parseInt(page), limit: parseInt(limit), total }, 'Attendance retrieved');
+  return paginatedResponse(res, attendance, {
+    page: parseInt(page, 10), limit: parseInt(limit, 10), total
+  }, 'Attendance retrieved');
+});
+
+// ─── POST /student/attendance/check-in ──────────────────────────────────────
+// Student self check-in. Uses the compound unique index (student, date) to
+// prevent duplicate check-ins on the same day.
+export const selfCheckInController = asyncHandler(async (req, res) => {
+  const studentId = req.user.studentRef;
+  if (!studentId) throw new NotFoundError('Student account not linked.');
+
+  const student = await Student.findById(studentId);
+  if (!student) throw new NotFoundError('Student profile not found.');
+
+  const today   = new Date().toISOString().slice(0, 10);
+  const nowTime = new Date().toTimeString().slice(0, 5);
+
+  // Check for existing record today
+  const existing = await Attendance.findOne({ student: studentId, date: today });
+  if (existing?.checkIn) {
+    // Already checked in — return the existing record (idempotent)
+    return successResponse(res, existing, `Already checked in today at ${existing.checkIn}`);
+  }
+
+  const record = await Attendance.findOneAndUpdate(
+    { student: studentId, date: today },
+    {
+      $setOnInsert: { student: studentId, date: today },
+      $set: {
+        checkIn:     nowTime,
+        checkOut:    '',
+        durationMins: 0,
+        method:      'self',
+        shift:       student.shift    || '',
+        seatCode:    student.seatCode || '',
+        markedBy:    null,           // self check-in, no admin
+        branch:      student.branch  || ''
+      }
+    },
+    { upsert: true, new: true }
+  );
+
+  return successResponse(res, record, 'Attendance marked successfully!', 201);
 });
 
 export const getPaymentsController = asyncHandler(async (req, res) => {

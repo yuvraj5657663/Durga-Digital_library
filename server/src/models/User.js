@@ -8,7 +8,7 @@ const userSchema = new mongoose.Schema(
     passwordHash: { type: String, required: true },
     role: { type: String, enum: ['admin', 'student'], required: true, default: 'student' },
     mobile: { type: String, trim: true, index: true, default: '' },
-    normalizedMobile: { type: String, trim: true, index: true, default: '' },
+    normalizedMobile: { type: String, trim: true, default: '' },
     active: { type: Boolean, default: true },
     studentRef: { type: mongoose.Schema.Types.ObjectId, ref: 'Student' },
     refreshTokens: [
@@ -32,5 +32,7 @@ const userSchema = new mongoose.Schema(
     }
   }
 );
+
+userSchema.index({ normalizedMobile: 1 });
 
 export default mongoose.model('User', userSchema);

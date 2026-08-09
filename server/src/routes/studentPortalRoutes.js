@@ -21,7 +21,8 @@ router.get('/id-card', portalController.getIdCardController);
 router.get('/membership', portalController.getMembershipController);
 
 // Attendance
-router.get('/attendance', portalController.getAttendanceController);
+router.get('/attendance',           portalController.getAttendanceController);
+router.post('/attendance/check-in', portalController.selfCheckInController);
 
 // Payments
 router.get('/payments', portalController.getPaymentsController);

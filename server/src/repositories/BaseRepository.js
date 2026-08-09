@@ -25,7 +25,7 @@ class BaseRepository {
   }
 
   async create(data, options = {}) {
-    return this.model.create([data], options);
+    return this.model.create(data, options);
   }
 
   async createMany(dataArray, options = {}) {

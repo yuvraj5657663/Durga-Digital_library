@@ -19,27 +19,29 @@ export const authMiddleware = async (req, res, next) => {
       // Check if it's the environment admin
       if (decoded.userId === 'env-admin') {
         req.user = {
-          id: 'env-admin',
-          role: 'admin',
+          id:       'env-admin',   // display / audit string only
+          userId:   null,           // null = not a real DB user, safe for ObjectId fields
+          role:     'admin',
           username: config.admin.user,
-          email: config.admin.email
+          email:    config.admin.email
         };
         return next();
       }
 
       // Find user in database
       const user = await userRepository.findById(decoded.userId);
-      
+
       if (!user || !user.active) {
         throw new AuthenticationError('Invalid or inactive user');
       }
 
       req.user = {
-        id: user._id.toString(),
-        role: user.role,
-        username: user.username,
-        email: user.email,
-        studentRef: user.studentRef
+        id:         user._id.toString(), // always a valid ObjectId string
+        userId:     user._id.toString(), // alias — use this for ObjectId fields
+        role:       user.role,
+        username:   user.username,
+        email:      user.email,
+        studentRef: user.studentRef ? user.studentRef.toString() : decoded.studentRef
       };
 
       next();

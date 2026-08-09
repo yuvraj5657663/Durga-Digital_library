@@ -8,6 +8,7 @@ import * as notifService from './notificationService.js';
 import studentRepository from '../repositories/StudentRepository.js';
 import membershipRepository from '../repositories/MembershipRepository.js';
 import logger from '../config/logger.js';
+import { toActorId } from '../utils/actorId.js';
 
 function generateReceiptNo() {
   const d = new Date();
@@ -65,7 +66,7 @@ export async function renew(opts) {
       expiryDate,
       fee: parseFloat(fee),
       duration: duration || `${months} Month(s)`,
-      activatedBy: adminUser?._id || null
+      activatedBy: toActorId(adminUser?._id || adminUser?.id)   // ← safe cast
     }], { session });
 
     const [payment] = await Payment.create([{
@@ -78,7 +79,7 @@ export async function renew(opts) {
       status: 'completed',
       transactionId,
       paidOn: startDate,
-      collectedBy: adminUser?._id || null,
+      collectedBy: toActorId(adminUser?._id || adminUser?.id),  // ← safe cast
       branch: student.branch || ''
     }], { session });
 
@@ -94,7 +95,7 @@ export async function renew(opts) {
 
     await AuditLog.create([{
       action: 'membership_renewed',
-      actorId: adminUser?._id,
+      actorId: toActorId(adminUser?._id || adminUser?.id),      // ← safe cast
       actorRole: adminUser?.role || 'admin',
       actorName: adminUser?.name || '',
       targetType: 'Student',

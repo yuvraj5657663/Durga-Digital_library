@@ -8,7 +8,7 @@ const studentSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true },
     email: { type: String, trim: true, lowercase: true, index: true, default: '' },
     mobile: { type: String, required: true, trim: true, index: true },
-    normalizedMobile: { type: String, trim: true, index: true, default: '' },
+    normalizedMobile: { type: String, trim: true, default: '' },
     preparation: { type: String, trim: true, default: 'General' },
     duration: { type: String, trim: true, default: '1 Month(s)' },
     joiningDate: { type: String, trim: true },
@@ -35,5 +35,6 @@ const studentSchema = new mongoose.Schema(
 );
 
 studentSchema.index({ seatCode: 1, shift: 1 });
+studentSchema.index({ normalizedMobile: 1 });
 
 export default mongoose.model('Student', studentSchema);

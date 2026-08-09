@@ -4,7 +4,7 @@ const inquirySchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
     mobile: { type: String, required: true, trim: true, index: true },
-    normalizedMobile: { type: String, trim: true, index: true, default: '' },
+    normalizedMobile: { type: String, trim: true, default: '' },
     email: { type: String, trim: true, default: '' },
     preparation: { type: String, trim: true, default: '' },
     preferred_shift: { type: String, trim: true, default: '' },
@@ -24,5 +24,7 @@ const inquirySchema = new mongoose.Schema(
     }
   }
 );
+
+inquirySchema.index({ normalizedMobile: 1 });
 
 export default mongoose.model('Inquiry', inquirySchema);
