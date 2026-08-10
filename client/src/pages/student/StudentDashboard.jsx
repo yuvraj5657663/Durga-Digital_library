@@ -1,13 +1,15 @@
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 import toast from 'react-hot-toast';
 import {
   Calendar, CreditCard, Bell, CheckCircle, Clock,
   Armchair, User, ChevronRight, Loader2, AlertTriangle,
-  History
+  History, RefreshCw
 } from 'lucide-react';
 import { portalService } from '../../services/portalService';
 import AspirantQuoteCard from '../../components/student/AspirantQuoteCard';
+import RenewalModal from '../../components/student/RenewalModal';
 import { differenceInDays, parseISO } from 'date-fns';
 
 /* ─── Skeleton block ────────────────────────────────────────────────────────── */
@@ -33,8 +35,8 @@ function ExpiryBadge({ expiryDate }) {
   );
 }
 
-/* ─── Today Attendance Card with self check-in ──────────────────────────────── */
-function TodayAttendanceCard({ todayAttendance, isLoading }) {
+/* ─── Today Attendance Card with self check-in/out ──────────────────────────────── */
+function TodayAttendanceCard({ todayAttendance, isLoading, student }) {
   const qc = useQueryClient();
   const now = new Date();
   const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
@@ -53,37 +55,66 @@ function TodayAttendanceCard({ todayAttendance, isLoading }) {
     },
   });
 
+  const checkOutMutation = useMutation({
+    mutationFn: () => portalService.selfCheckOut(),
+    onSuccess: (record) => {
+      toast.success(`✅ Check-out marked at ${record?.checkOut || timeStr}!`, { duration: 4000 });
+      // Invalidate both student dashboard and admin attendance so both panels update
+      qc.invalidateQueries({ queryKey: ['student', 'dashboard'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'attendance']  });
+      qc.invalidateQueries({ queryKey: ['admin', 'stats']       });
+    },
+    onError: (err) => {
+      toast.error(err.response?.data?.message || 'Check-out failed. Please try again.');
+    },
+  });
+
   const isPresent  = !!todayAttendance?.checkIn;
+  const isCheckedOut = !!todayAttendance?.checkOut;
   const checkInAt  = todayAttendance?.checkIn;
+  const checkOutAt = todayAttendance?.checkOut;
+  const duration   = todayAttendance?.durationMins;
+  const studentShift = student?.shift || 'Shift 1';
 
   return (
-    <div className={`card flex flex-col gap-3 ${isPresent ? 'border-l-4 border-green-500' : 'border-l-4 border-orange-400'}`}>
+    <div className={`card flex flex-col gap-3 ${isCheckedOut ? 'border-l-4 border-blue-500' : isPresent ? 'border-l-4 border-green-500' : 'border-l-4 border-orange-400'}`}>
       <div className="flex items-start justify-between">
         <div>
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Today's Attendance</p>
+          <p className="text-xs text-gray-400 mt-1">Shift: {studentShift}</p>
           {isLoading
             ? <Sk className="h-6 w-24 mt-2" />
-            : isPresent
+            : isCheckedOut
               ? (
                   <div className="mt-1.5">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-bold bg-green-100 text-green-700">
-                      <CheckCircle className="w-4 h-4" /> Present
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-bold bg-blue-100 text-blue-700">
+                      <Clock className="w-4 h-4" /> Completed
                     </span>
-                    <p className="text-xs text-gray-400 mt-1">Checked in at {checkInAt}</p>
+                    <p className="text-xs text-gray-400 mt-1">In: {checkInAt} | Out: {checkOutAt}</p>
+                    {duration && <p className="text-xs text-gray-400">Duration: {duration} min</p>}
                   </div>
                 )
-              : (
-                  <p className="text-sm font-semibold text-orange-600 mt-1.5 flex items-center gap-1">
-                    <Clock className="w-4 h-4" /> Not marked yet
-                  </p>
-                )}
+              : isPresent
+                ? (
+                    <div className="mt-1.5">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-bold bg-green-100 text-green-700">
+                        <CheckCircle className="w-4 h-4" /> Present
+                      </span>
+                      <p className="text-xs text-gray-400 mt-1">Checked in at {checkInAt}</p>
+                    </div>
+                  )
+                : (
+                    <p className="text-sm font-semibold text-orange-600 mt-1.5 flex items-center gap-1">
+                      <Clock className="w-4 h-4" /> Not marked yet
+                    </p>
+                  )}
         </div>
-        <div className={`p-2.5 rounded-xl ${isPresent ? 'bg-green-100' : 'bg-orange-100'}`}>
-          <Calendar className={`w-5 h-5 ${isPresent ? 'text-green-600' : 'text-orange-500'}`} />
+        <div className={`p-2.5 rounded-xl ${isCheckedOut ? 'bg-blue-100' : isPresent ? 'bg-green-100' : 'bg-orange-100'}`}>
+          <Calendar className={`w-5 h-5 ${isCheckedOut ? 'text-blue-600' : isPresent ? 'text-green-600' : 'text-orange-500'}`} />
         </div>
       </div>
 
-      {/* Mark Attendance button — only shown when not yet checked in */}
+      {/* Mark Attendance buttons */}
       {!isLoading && !isPresent && (
         <button
           onClick={() => checkInMutation.mutate()}
@@ -98,6 +129,21 @@ function TodayAttendanceCard({ todayAttendance, isLoading }) {
           }
         </button>
       )}
+
+      {!isLoading && isPresent && !isCheckedOut && (
+        <button
+          onClick={() => checkOutMutation.mutate()}
+          disabled={checkOutMutation.isPending}
+          className="w-full mt-1 flex items-center justify-center gap-2 py-2.5
+            bg-blue-500 hover:bg-blue-600 text-white text-sm font-bold
+            rounded-lg transition-colors active:scale-95 disabled:opacity-60"
+        >
+          {checkOutMutation.isPending
+            ? <><Loader2 className="w-4 h-4 animate-spin" /> Checking out…</>
+            : <><Clock className="w-4 h-4" /> Check Out</>
+          }
+        </button>
+      )}
     </div>
   );
 }
@@ -105,6 +151,7 @@ function TodayAttendanceCard({ todayAttendance, isLoading }) {
 /* ─── Main Dashboard ─────────────────────────────────────────────────────────── */
 export default function StudentDashboard() {
   const navigate = useNavigate();
+  const [renewalModalOpen, setRenewalModalOpen] = useState(false);
 
   const { data: dashboard, isLoading } = useQuery({
     queryKey: ['student', 'dashboard'],
@@ -172,6 +219,12 @@ export default function StudentDashboard() {
                   {membership?.status || 'N/A'}
                 </p>
                 <ExpiryBadge expiryDate={membership?.expiryDate} />
+                <button
+                  onClick={() => setRenewalModalOpen(true)}
+                  className="mt-2 w-full flex items-center justify-center gap-2 py-2 bg-library-blue hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors"
+                >
+                  <RefreshCw className="w-4 h-4" /> Renew
+                </button>
               </>}
         </div>
 
@@ -195,7 +248,7 @@ export default function StudentDashboard() {
 
         {/* Today Attendance — full card with check-in button */}
         <div className="col-span-2 lg:col-span-1">
-          <TodayAttendanceCard todayAttendance={todayAtt} isLoading={isLoading} />
+          <TodayAttendanceCard todayAttendance={todayAtt} isLoading={isLoading} student={student} />
         </div>
 
         {/* Unread Notifications */}
@@ -308,6 +361,13 @@ export default function StudentDashboard() {
 
       {/* ── Daily Motivational Quote Banner (fills bottom white space) ── */}
       <AspirantQuoteCard />
+
+      {/* ── Renewal Modal ── */}
+      <RenewalModal 
+        open={renewalModalOpen} 
+        onClose={() => setRenewalModalOpen(false)}
+        currentExpiry={membership?.expiryDate}
+      />
     </div>
   );
 }

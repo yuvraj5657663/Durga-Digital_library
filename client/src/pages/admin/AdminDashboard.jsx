@@ -13,6 +13,7 @@ import {
 import { studentService } from '../../services/studentService';
 import AddStudentModal from './components/AddStudentModal';
 import SeatMatrixGrid from '../../components/admin/SeatMatrixGrid';
+import RenewalRequestsPanel from '../../components/admin/RenewalRequestsPanel';
 
 // ── Skeleton ──────────────────────────────────────────────────────────────────
 const Skeleton = ({ className = '' }) => (
@@ -147,6 +148,42 @@ export default function AdminDashboard() {
         </div>
       </div>
 
+      {/* Real-time Attendance Status */}
+      <div className="card">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-semibold text-gray-900">Real-time Attendance Status</h2>
+          <span className="text-xs text-gray-400">Updated: {new Date().toLocaleTimeString()}</span>
+        </div>
+        {isLoading ? (
+          <Skeleton className="h-24 w-full" />
+        ) : stats?.currentAttendance && stats.currentAttendance.length > 0 ? (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            {stats.currentAttendance.map((shift) => (
+              <div key={shift.shift} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                <p className="text-xs font-semibold text-gray-600 uppercase">{shift.shift}</p>
+                <div className="mt-2 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-500">Checked In:</span>
+                    <span className="text-sm font-bold text-green-600">{shift.checkedIn}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-500">Checked Out:</span>
+                    <span className="text-sm font-bold text-blue-600">{shift.checkedOut}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-500">Present:</span>
+                    <span className="text-sm font-bold text-purple-600">{shift.currentlyPresent}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="h-24 flex items-center justify-center text-gray-400 text-sm">No attendance data for today</div>
+        )}
+      </div>
+      </div>
+
       {/* Revenue trend */}
       <div className="card">
         <h2 className="text-base font-semibold text-gray-900 mb-4">Monthly Revenue (₹)</h2>
@@ -199,6 +236,9 @@ export default function AdminDashboard() {
           <button onClick={() => navigate('/admin/announcements')} className="btn btn-secondary">Announcement</button>
         </div>
       </div>
+
+      {/* Renewal Requests Panel */}
+      <RenewalRequestsPanel />
 
       {/* Add Student Modal */}
       <AddStudentModal

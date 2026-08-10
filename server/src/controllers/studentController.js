@@ -442,6 +442,19 @@ export const getDashboardStatsController = asyncHandler(async (req, res) => {
     { $sort: { _id: 1 } }
   ]);
 
+  // Real-time attendance status by shift
+  const today = new Date().toISOString().slice(0, 10);
+  const currentAttendanceByShift = await Attendance.aggregate([
+    { $match: { date: today } },
+    { $group: { 
+      _id: '$shiftType',
+      checkedIn: { $sum: { $cond: [{ $ne: ['$checkIn', ''] }, 1, 0] } },
+      checkedOut: { $sum: { $cond: [{ $ne: ['$checkOut', ''] }, 1, 0] } },
+      currentlyPresent: { $sum: { $cond: [{ $and: [{ $ne: ['$checkIn', ''] }, { $eq: ['$checkOut', ''] }] }, 1, 0] } }
+    }},
+    { $sort: { _id: 1 } }
+  ]);
+
   // Monthly revenue last 6 months
   const revenueByMonth = await Payment.aggregate([
     { $match: { status: 'completed' } },
@@ -463,6 +476,12 @@ export const getDashboardStatsController = asyncHandler(async (req, res) => {
     attendanceTrend: last7.map(date => ({
       date,
       count: attendanceTrend.find(a => a._id === date)?.count || 0
+    })),
+    currentAttendance: currentAttendanceByShift.map(a => ({
+      shift: a._id || 'Unknown',
+      checkedIn: a.checkedIn,
+      checkedOut: a.checkedOut,
+      currentlyPresent: a.currentlyPresent
     })),
     revenueByMonth: revenueByMonth.map(r => ({ month: r._id, revenue: r.total }))
   }, 'Dashboard stats retrieved');

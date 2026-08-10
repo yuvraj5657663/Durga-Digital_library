@@ -3,6 +3,7 @@ import Notification from '../models/Notification.js';
 import config from '../config/index.js';
 import logger from '../config/logger.js';
 import { generateAdmissionReceipt } from './pdfService.js';
+import { hasShiftEnded, getShiftEndTime, SHIFT_CONFIG } from '../config/shiftConfig.js';
 
 const transporter = nodemailer.createTransport({
   service: 'gmail',
@@ -200,4 +201,75 @@ export async function getForStudent(studentId, { page = 1, limit = 20, unreadOnl
 
 export async function broadcast({ type = 'announcement', title, body, metadata = {} }) {
   return Notification.create({ recipient: null, type, title, body, channel: 'in_app', metadata });
+}
+
+export async function sendShiftEndNotification({ student, attendance }) {
+  const shiftConfig = SHIFT_CONFIG[student.shift];
+  if (!shiftConfig || shiftConfig.isFlexible) {
+    return { sent: false, reason: 'shift_not_configured' };
+  }
+
+  const title = '🕐 Shift Ended - Attendance Reminder';
+  const shiftEndTime = getShiftEndTime(student.shift);
+  
+  const body = `Namaste ${student.name},\n\nAapka ${shiftConfig.description} end ho gaya hai (${shiftEndTime}).\n\nAapka attendance record:\n📌 Check-in: ${attendance.checkIn}\n📌 Check-out: ${attendance.checkOut || 'Pending'}\n⏱️ Duration: ${attendance.durationMins} minutes\n📌 Seat: ${student.seatCode}\n\nKripya check-out karein agar aapne abhi tak nahi kiya.\n\nDurga Digital Library\nContact: 7542893960`;
+
+  return send({
+    recipient: student._id,
+    type: 'shift_end_reminder',
+    title,
+    body,
+    channel: 'all',
+    email: student.email,
+    mobile: student.mobile,
+    metadata: {
+      shift: student.shift,
+      checkIn: attendance.checkIn,
+      checkOut: attendance.checkOut,
+      duration: attendance.durationMins,
+      date: attendance.date
+    }
+  });
+}
+
+export async function checkAndSendShiftEndNotifications() {
+  try {
+    // Find students who are currently checked in (checkIn present, no checkOut)
+    const today = new Date().toISOString().slice(0, 10);
+    const activeAttendances = await Attendance.find({
+      date: today,
+      checkIn: { $ne: '' },
+      checkOut: '',
+      isValidated: true
+    }).populate('student');
+
+    const notificationsSent = [];
+
+    for (const attendance of activeAttendances) {
+      if (!attendance.student) continue;
+
+      const studentShift = attendance.student.shift;
+      const customTiming = attendance.student.customTiming;
+
+      // Check if shift has ended
+      if (hasShiftEnded(studentShift)) {
+        const result = await sendShiftEndNotification({
+          student: attendance.student,
+          attendance: attendance
+        });
+        notificationsSent.push({
+          studentId: attendance.student._id,
+          studentName: attendance.student.name,
+          shift: studentShift,
+          result
+        });
+      }
+    }
+
+    logger.info(`[Shift End Notifications] Sent ${notificationsSent.length} notifications`);
+    return notificationsSent;
+  } catch (error) {
+    logger.error('[Shift End Notifications] Error:', error.message);
+    return [];
+  }
 }

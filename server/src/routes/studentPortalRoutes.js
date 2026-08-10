@@ -1,6 +1,7 @@
 import express from 'express';
 import { authMiddleware, requireStudent } from '../middlewares/authMiddleware.js';
 import * as portalController from '../controllers/studentPortalController.js';
+import * as renewalController from '../controllers/renewalController.js';
 
 const router = express.Router();
 
@@ -23,6 +24,11 @@ router.get('/membership', portalController.getMembershipController);
 // Attendance
 router.get('/attendance',           portalController.getAttendanceController);
 router.post('/attendance/check-in', portalController.selfCheckInController);
+router.post('/attendance/check-out', portalController.selfCheckOutController);
+
+// Renewal Requests
+router.post('/renewal/request', renewalController.createRenewalRequestController);
+router.get('/renewal/status', renewalController.getRenewalStatusController);
 
 // Payments
 router.get('/payments', portalController.getPaymentsController);

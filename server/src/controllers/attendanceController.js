@@ -1,9 +1,10 @@
 import Attendance from '../models/Attendance.js';
 import Student from '../models/Student.js';
 import { successResponse, paginatedResponse } from '../utils/response.js';
-import { asyncHandler, NotFoundError } from '../utils/errors.js';
+import { asyncHandler, NotFoundError, ValidationError } from '../utils/errors.js';
 import AuditLog from '../models/AuditLog.js';
 import { toActorId } from '../utils/actorId.js';
+import { validateCheckIn, validateCheckOut, getCurrentTime } from '../config/shiftConfig.js';
 
 export const listAttendanceController = asyncHandler(async (req, res) => {
   const { page = 1, limit = 50, date, shift, branch, studentId } = req.query;
@@ -42,7 +43,24 @@ export const markAttendanceController = asyncHandler(async (req, res) => {
   if (!student) throw new NotFoundError('Student not found');
 
   const attendDate = date     || new Date().toISOString().slice(0, 10);
-  const inTime     = checkIn  || new Date().toTimeString().slice(0, 5);
+  const inTime     = checkIn  || getCurrentTime();
+  const studentShift = shift || student.shift || '';
+
+  // Shift-based validation for check-in
+  if (inTime && !checkOut) {
+    const checkInValidation = validateCheckIn(studentShift, student.customTiming);
+    if (!checkInValidation.isValid) {
+      throw new ValidationError(checkInValidation.message);
+    }
+  }
+
+  // Shift-based validation for check-out
+  if (checkOut) {
+    const checkOutValidation = validateCheckOut(studentShift, student.customTiming);
+    if (!checkOutValidation.isValid) {
+      throw new ValidationError(checkOutValidation.message);
+    }
+  }
 
   let durationMins = 0;
   if (inTime && checkOut) {
@@ -51,20 +69,26 @@ export const markAttendanceController = asyncHandler(async (req, res) => {
     durationMins = Math.max(0, (oh * 60 + om) - (ih * 60 + im));
   }
 
+  const now = new Date();
   const attendance = await Attendance.findOneAndUpdate(
     { student: studentId, date: attendDate },
     {
       $setOnInsert: { student: studentId, date: attendDate },
       $set: {
-        checkIn:     inTime,
-        checkOut:    checkOut || '',
+        checkIn:             inTime,
+        checkOut:            checkOut || '',
+        checkInTimestamp:    checkIn ? now : null, // NEW: Exact timestamp
+        checkOutTimestamp:   checkOut ? now : null, // NEW: Exact timestamp
         durationMins,
-        method:      method    || 'manual',
-        shift:       shift     || student.shift     || '',
-        seatCode:    seatCode  || student.seatCode  || '',
-        markedBy:    toActorId(req.user.id),          // ← safe cast
-        notes:       notes || '',
-        branch:      student.branch || ''
+        method:              method    || 'manual',
+        shift:               studentShift,
+        shiftType:           studentShift, // NEW: For shift-based validation
+        seatCode:            seatCode  || student.seatCode  || '',
+        markedBy:            toActorId(req.user.id),
+        notes:               notes || '',
+        branch:              student.branch || '',
+        isValidated:         true, // NEW: Validation passed
+        validationMessage:   '' // NEW: No validation error
       }
     },
     { upsert: true, new: true }
@@ -73,13 +97,13 @@ export const markAttendanceController = asyncHandler(async (req, res) => {
   // AuditLog.actorId is also ObjectId — use toActorId
   await AuditLog.create({
     action:     'attendance_marked',
-    actorId:    toActorId(req.user.id),               // ← safe cast
+    actorId:    toActorId(req.user.id),
     actorRole:  req.user.role,
     actorName:  req.user.username,
     targetType: 'Attendance',
     targetId:   attendance._id.toString(),
     targetName: `${student.name} - ${attendDate}`,
-    details:    { method, checkIn: inTime, checkOut, durationMins }
+    details:    { method, checkIn: inTime, checkOut, durationMins, shift: studentShift }
   });
 
   return successResponse(res, attendance, 'Attendance marked successfully');
@@ -100,35 +124,61 @@ export const scanQrAttendanceController = asyncHandler(async (req, res) => {
 
   if (!student) throw new NotFoundError('Student not found');
 
-  const now = new Date().toTimeString().slice(0, 5);
+  const now = getCurrentTime();
+  const nowTimestamp = new Date();
+  const studentShift = student.shift || '';
 
   // Toggle: if already checked in with no checkout → check out; else check in
   const existing = await Attendance.findOne({ student: student._id, date });
   let attendance;
 
   if (existing?.checkIn && !existing?.checkOut) {
+    // Check-out action - validate against shift
+    const checkOutValidation = validateCheckOut(studentShift, student.customTiming);
+    if (!checkOutValidation.isValid) {
+      throw new ValidationError(checkOutValidation.message);
+    }
+
     const [ih, im] = existing.checkIn.split(':').map(Number);
     const [oh, om] = now.split(':').map(Number);
     const durationMins = Math.max(0, (oh * 60 + om) - (ih * 60 + im));
     attendance = await Attendance.findByIdAndUpdate(
       existing._id,
-      { checkOut: now, durationMins, method: 'qr_scan' },
+      { 
+        checkOut: now, 
+        checkOutTimestamp: nowTimestamp, // NEW: Exact timestamp
+        durationMins, 
+        method: 'qr_scan',
+        isValidated: true,
+        validationMessage: ''
+      },
       { new: true }
     );
   } else {
+    // Check-in action - validate against shift
+    const checkInValidation = validateCheckIn(studentShift, student.customTiming);
+    if (!checkInValidation.isValid) {
+      throw new ValidationError(checkInValidation.message);
+    }
+
     attendance = await Attendance.findOneAndUpdate(
       { student: student._id, date },
       {
         $setOnInsert: { student: student._id, date },
         $set: {
           checkIn:  now,
+          checkInTimestamp: nowTimestamp, // NEW: Exact timestamp
           checkOut: '',
+          checkOutTimestamp: null,
           durationMins: 0,
           method:   'qr_scan',
-          shift:    student.shift    || '',
+          shift:    studentShift,
+          shiftType: studentShift, // NEW: For shift-based validation
           seatCode: student.seatCode || '',
-          markedBy: toActorId(req.user?.id),           // ← safe cast
-          branch:   student.branch   || ''
+          markedBy: toActorId(req.user?.id),
+          branch:   student.branch   || '',
+          isValidated: true, // NEW: Validation passed
+          validationMessage: '' // NEW: No validation error
         }
       },
       { upsert: true, new: true }
@@ -137,19 +187,24 @@ export const scanQrAttendanceController = asyncHandler(async (req, res) => {
 
   await AuditLog.create({
     action:     'attendance_qr_scan',
-    actorId:    toActorId(req.user?.id),               // ← safe cast
+    actorId:    toActorId(req.user?.id),
     actorRole:  req.user?.role   || 'system',
     actorName:  req.user?.username || 'QR',
     targetType: 'Attendance',
     targetId:   attendance._id.toString(),
     targetName: `${student.name} - ${date}`,
-    details:    { method: 'qr_scan', checkIn: now, action: existing?.checkIn && !existing?.checkOut ? 'checkout' : 'checkin' }
+    details:    { 
+      method: 'qr_scan', 
+      checkIn: now, 
+      action: existing?.checkIn && !existing?.checkOut ? 'checkout' : 'checkin',
+      shift: studentShift 
+    }
   });
 
   return successResponse(res, {
     action:  existing?.checkIn && !existing?.checkOut ? 'checked_out' : 'checked_in',
     time:    now,
-    student: { name: student.name, studentId: student.studentId, seatCode: student.seatCode },
+    student: { name: student.name, studentId: student.studentId, seatCode: student.seatCode, shift: studentShift },
     attendance
   }, 'QR attendance processed');
 });

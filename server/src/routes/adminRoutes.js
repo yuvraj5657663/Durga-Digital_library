@@ -7,6 +7,7 @@ import * as membershipController from '../controllers/membershipController.js';
 import * as attendanceController from '../controllers/attendanceController.js';
 import * as announcementController from '../controllers/announcementController.js';
 import * as admissionController  from '../controllers/admissionRequestController.js';
+import * as renewalController   from '../controllers/renewalController.js';
 import Seat from '../models/Seat.js';
 
 const router = express.Router();
@@ -81,6 +82,12 @@ router.post('/memberships/renew',                 validate(renewMembershipSchema
 router.get('/memberships/expiring',               membershipController.getExpiringSoonController);
 router.get('/memberships/:studentId/history',     membershipController.getMembershipHistoryController);
 router.get('/memberships/:studentId/current',     membershipController.getCurrentMembershipController);
+
+// ── Renewal Requests ────────────────────────────────────────────────────────
+router.get('/renewal/requests',                 renewalController.getRenewalRequestsController);
+router.post('/renewal/:requestId/approve',       renewalController.approveRenewalRequestController);
+router.post('/renewal/:requestId/reject',        renewalController.rejectRenewalRequestController);
+router.delete('/renewal/:requestId',              renewalController.deleteRenewalRequestController);
 
 // ── Attendance ────────────────────────────────────────────────────────────────
 router.get('/attendance',         attendanceController.listAttendanceController);

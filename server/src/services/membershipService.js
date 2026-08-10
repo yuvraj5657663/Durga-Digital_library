@@ -36,7 +36,8 @@ export async function renew(opts) {
     joiningDate,
     adminUser,
     transactionId = '',
-    session: callerSession = null
+    session: callerSession = null,
+    existingPayment = null // NEW: For renewal requests
   } = opts;
 
   const ownSession = callerSession === null;
@@ -50,7 +51,7 @@ export async function renew(opts) {
     const months = parseDurationMonths(duration);
     const startDate = joiningDate || new Date().toISOString().slice(0, 10);
     const expiryDate = addMonths(startDate, months);
-    const receiptNo = generateReceiptNo();
+    const receiptNo = existingPayment?.receiptNo || generateReceiptNo();
 
     await Membership.updateMany(
       { student: student._id, status: 'Active' },
@@ -66,22 +67,37 @@ export async function renew(opts) {
       expiryDate,
       fee: parseFloat(fee),
       duration: duration || `${months} Month(s)`,
-      activatedBy: toActorId(adminUser?._id || adminUser?.id)   // ← safe cast
+      activatedBy: toActorId(adminUser?._id || adminUser?.id)
     }], { session });
 
-    const [payment] = await Payment.create([{
-      student: student._id,
-      membership: membership._id,
-      receiptNo,
-      type: 'renewal',
-      amount: parseFloat(fee),
-      mode: paymentMode,
-      status: 'completed',
-      transactionId,
-      paidOn: startDate,
-      collectedBy: toActorId(adminUser?._id || adminUser?.id),  // ← safe cast
-      branch: student.branch || ''
-    }], { session });
+    // If we have an existing payment (renewal request), update it
+    if (existingPayment) {
+      await Payment.findByIdAndUpdate(
+        existingPayment._id,
+        {
+          membership: membership._id,
+          status: 'completed',
+          paidOn: startDate,
+          collectedBy: toActorId(adminUser?._id || adminUser?.id)
+        },
+        { session }
+      );
+    } else {
+      // Create new payment record
+      const [payment] = await Payment.create([{
+        student: student._id,
+        membership: membership._id,
+        receiptNo,
+        type: 'renewal',
+        amount: parseFloat(fee),
+        mode: paymentMode,
+        status: 'completed',
+        transactionId,
+        paidOn: startDate,
+        collectedBy: toActorId(adminUser?._id || adminUser?.id),
+        branch: student.branch || ''
+      }], { session });
+    }
 
     await Student.findByIdAndUpdate(
       student._id,
@@ -95,7 +111,7 @@ export async function renew(opts) {
 
     await AuditLog.create([{
       action: 'membership_renewed',
-      actorId: toActorId(adminUser?._id || adminUser?.id),      // ← safe cast
+      actorId: toActorId(adminUser?._id || adminUser?.id),
       actorRole: adminUser?.role || 'admin',
       actorName: adminUser?.name || '',
       targetType: 'Student',
@@ -113,7 +129,7 @@ export async function renew(opts) {
       logger.error('[membershipService] renewal notif error:', err.message)
     );
 
-    return { membership, payment, student, receiptNo, expiryDate };
+    return { membership, student, receiptNo, expiryDate };
   } catch (err) {
     if (ownSession) {
       await session.abortTransaction();
