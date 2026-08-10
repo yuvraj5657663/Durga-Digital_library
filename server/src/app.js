@@ -71,9 +71,21 @@ app.use(cors({
       return callback(null, true);
     }
     
+    // In production, if ALLOWED_ORIGINS is empty, allow the specific EC2 IP
+    if (config.env === 'production' && allowedOrigins.length === 0) {
+      // Temporarily allow the EC2 IP for testing
+      const ec2Origins = ['http://65.1.235.131', 'http://65.1.235.131:5173'];
+      if (ec2Origins.includes(origin)) {
+        return callback(null, true);
+      }
+    }
+    
     callback(new Error(`CORS: origin ${origin} not allowed`));
   },
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Content-Length', 'Content-Type']
 }));
 
 // Body parsing middleware

@@ -11,9 +11,8 @@ dotenv.config({ path: path.join(process.cwd(), '.env') });
 export const config = {
   env: process.env.NODE_ENV || 'development',
   port: parseInt(process.env.PORT, 10) || 3000,
-  // In production always bind to 0.0.0.0 so Nginx (on the same machine) can reach it.
-  // 'localhost' / '127.0.0.1' works too as long as Nginx proxies to 127.0.0.1:3000,
-  // but 0.0.0.0 is safer and avoids "connection refused" on some distros.
+  // Explicitly bind to 0.0.0.0 in production for external access
+  // Localhost binding in development, 0.0.0.0 in production
   host: process.env.HOST || (process.env.NODE_ENV === 'production' ? '0.0.0.0' : 'localhost'),
   
   database: {

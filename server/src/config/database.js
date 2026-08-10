@@ -18,10 +18,13 @@ class Database {
 
     try {
       this.connection = await mongoose.connect(uri, {
-        serverSelectionTimeoutMS: 10000,
+        serverSelectionTimeoutMS: 5000,
         socketTimeoutMS: 45000,
         maxPoolSize: 10,
         minPoolSize: 2,
+        connectTimeoutMS: 10000,
+        retryWrites: true,
+        retryReads: true,
       });
 
       this.isConnected = true;

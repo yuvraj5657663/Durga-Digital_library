@@ -6,6 +6,21 @@ import { startCronJobs } from './jobs/cronJobs.js';
 import { setupWhatsApp } from './jobs/whatsappSetup.js';
 import { validateEnvironment } from './utils/startupValidation.js';
 
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  // In production, we want to keep the server running
+  if (config.env !== 'production') {
+    process.exit(1);
+  }
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  logger.error('Uncaught Exception:', error);
+  process.exit(1);
+});
+
 async function startServer() {
   try {
     // Environment validation
