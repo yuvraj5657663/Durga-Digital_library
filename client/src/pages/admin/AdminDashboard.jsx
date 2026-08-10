@@ -182,7 +182,6 @@ export default function AdminDashboard() {
           <div className="h-24 flex items-center justify-center text-gray-400 text-sm">No attendance data for today</div>
         )}
       </div>
-      </div>
 
       {/* Revenue trend */}
       <div className="card">
