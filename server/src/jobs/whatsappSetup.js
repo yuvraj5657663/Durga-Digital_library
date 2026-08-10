@@ -1,4 +1,4 @@
-import { Client } from 'whatsapp-web.js';
+import { Client, LocalAuth } from 'whatsapp-web.js';
 import qrcode from 'qrcode-terminal';
 import config from '../config/index.js';
 import logger from '../config/logger.js';
@@ -13,9 +13,26 @@ export function setupWhatsApp() {
   }
 
   whatsappClient = new Client({
-    puppeteer: { 
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-      headless: true
+    authStrategy: new LocalAuth({
+      clientId: 'durga-library-session'
+    }),
+    webVersionCache: {
+      type: 'remote',
+      remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
+    },
+    puppeteer: {
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--no-first-run',
+        '--no-zygote',
+        '--disable-gpu',
+        '--disable-web-security',
+        '--disable-features=IsolateOrigins,site-per-process'
+      ]
     }
   });
 
@@ -28,16 +45,24 @@ export function setupWhatsApp() {
   whatsappClient.on('ready', () => {
     isWaReady = true;
     logger.info('✅ WhatsApp Client connected and READY!');
+    console.log('[WhatsApp] Client is ready and authenticated');
   });
 
-  whatsappClient.on('auth_failure', () => { 
+  whatsappClient.on('authenticated', () => {
+    logger.info('✅ WhatsApp Client authenticated successfully');
+    console.log('[WhatsApp] Authentication successful - session saved');
+  });
+
+  whatsappClient.on('auth_failure', (msg) => { 
     isWaReady = false; 
-    logger.warn('WhatsApp authentication failed');
+    logger.error('❌ WhatsApp authentication failed:', msg);
+    console.error('[WhatsApp] Authentication failed:', msg);
   });
   
-  whatsappClient.on('disconnected', () => { 
+  whatsappClient.on('disconnected', (reason) => { 
     isWaReady = false; 
-    logger.warn('WhatsApp disconnected');
+    logger.warn('⚠️ WhatsApp disconnected:', reason);
+    console.warn('[WhatsApp] Client disconnected:', reason);
   });
 
   whatsappClient.initialize().catch(err => {
