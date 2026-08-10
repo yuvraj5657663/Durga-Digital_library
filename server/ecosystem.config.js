@@ -16,10 +16,13 @@ module.exports = {
       max_restarts: 5,
       restart_delay: 5000,
 
+      env_file: '.env',
+
       env_production: {
         NODE_ENV:    'production',
         PORT:        3000,
         HOST:        '0.0.0.0',  // Bind to all interfaces so Nginx can reach it
+        WHATSAPP_ENABLED: 'false',
 
         // ── These MUST be overridden in /etc/environment or passed via --env-file ──
         // Do NOT hardcode secrets here. Set them with:
