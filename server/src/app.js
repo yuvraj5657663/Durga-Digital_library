@@ -73,9 +73,9 @@ app.use(cors({
     
     // In production, if ALLOWED_ORIGINS is empty, allow the specific EC2 IP
     if (config.env === 'production' && allowedOrigins.length === 0) {
-      // Temporarily allow the EC2 IP for testing
-      const ec2Origins = ['http://65.1.235.131', 'http://65.1.235.131:5173'];
-      if (ec2Origins.includes(origin)) {
+      // Temporarily allow the domain for testing
+      const domainOrigins = ['https://durgadigitallibrary.online', 'http://durgadigitallibrary.online', 'http://65.1.235.131', 'http://65.1.235.131:5173'];
+      if (domainOrigins.includes(origin)) {
         return callback(null, true);
       }
     }

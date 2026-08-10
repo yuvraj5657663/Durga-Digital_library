@@ -117,7 +117,7 @@ export async function send(opts = {}) {
 
 export async function sendRenewalReminder({ student, daysLeft }) {
   const title = '⚠️ Membership Expiry Reminder';
-  const body = `Namaste ${student.name},\n\nAapki library membership (Seat ${student.seatCode}) ${daysLeft} din mein expire ho rahi hai (${student.expiryDate}).\n\nKripya renewal karwayein taaki aapki seat surakshit rahe.\n\nDurga Digital Library\nContact: 7542893960`;
+  const body = `Namaste ${student.name},\n\nAapki library membership (Seat ${student.seatCode}) ${daysLeft} din mein expire ho rahi hai (${student.expiryDate}).\n\nKripya renewal karwayein taaki aapki seat surakshit rahe.\n\nDurga Digital Library\n🌐 Website: https://durgadigitallibrary.online\n📞 Contact: 7542893960`;
 
   return send({
     recipient: student._id,
@@ -141,6 +141,7 @@ export async function sendMembershipActivated({ student, membership }) {
   const body = `DURGA DIGITAL LIBRARY, MUNGER 📚
 📍 Location: Kalarampur, Near Shiv Mandir, NH-80, Munger - 811211
 📞 Contact Person: Saurav Kumar (7542893960)
+🌐 Website: https://durgadigitallibrary.online
 
 Namaste ${student.name},
 Aapka admission successfully confirm ho gaya hai!
@@ -212,7 +213,7 @@ export async function sendShiftEndNotification({ student, attendance }) {
   const title = '🕐 Shift Ended - Attendance Reminder';
   const shiftEndTime = getShiftEndTime(student.shift);
   
-  const body = `Namaste ${student.name},\n\nAapka ${shiftConfig.description} end ho gaya hai (${shiftEndTime}).\n\nAapka attendance record:\n📌 Check-in: ${attendance.checkIn}\n📌 Check-out: ${attendance.checkOut || 'Pending'}\n⏱️ Duration: ${attendance.durationMins} minutes\n📌 Seat: ${student.seatCode}\n\nKripya check-out karein agar aapne abhi tak nahi kiya.\n\nDurga Digital Library\nContact: 7542893960`;
+  const body = `Namaste ${student.name},\n\nAapka ${shiftConfig.description} end ho gaya hai (${shiftEndTime}).\n\nAapka attendance record:\n📌 Check-in: ${attendance.checkIn}\n📌 Check-out: ${attendance.checkOut || 'Pending'}\n⏱️ Duration: ${attendance.durationMins} minutes\n📌 Seat: ${student.seatCode}\n\nKripya check-out karein agar aapne abhi tak nahi kiya.\n\nDurga Digital Library\n🌐 Website: https://durgadigitallibrary.online\n📞 Contact: 7542893960`;
 
   return send({
     recipient: student._id,

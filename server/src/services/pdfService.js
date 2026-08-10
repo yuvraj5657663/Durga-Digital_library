@@ -34,6 +34,8 @@ export async function generateAdmissionReceipt(data) {
          .text('Kalarampur, Near Shiv Mandir, NH-80, Munger - 811211', tx, 32, { width: tw });
       doc.font('Helvetica-Bold').fontSize(6.5).fillColor('#fff')
          .text('Contact: Saurav Kumar (7542893960)', tx, 44, { width: tw });
+      doc.font('Helvetica').fontSize(5).fillColor('#bcd0e8')
+         .text('Website: https://durgadigitallibrary.online', tx, 50, { width: tw });
 
       // Receipt title
       doc.rect(0, 64, PAGE_W, 18).fill('#ebf4ff');
@@ -112,6 +114,8 @@ export async function generateRenewalReceipt(data) {
          .text('Kalarampur, Near Shiv Mandir, NH-80, Munger - 811211', tx, 32, { width: tw });
       doc.font('Helvetica-Bold').fontSize(6.5).fillColor('#fff')
          .text('Contact: Saurav Kumar (7542893960)', tx, 44, { width: tw });
+      doc.font('Helvetica').fontSize(5).fillColor('#bcd0e8')
+         .text('Website: https://durgadigitallibrary.online', tx, 50, { width: tw });
 
       doc.rect(0, 64, PAGE_W, 18).fill('#ebf4ff');
       doc.font('Helvetica-Bold').fontSize(8).fillColor('#0c447c')
