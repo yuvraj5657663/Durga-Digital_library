@@ -443,7 +443,6 @@ export const getDashboardStatsController = asyncHandler(async (req, res) => {
   ]);
 
   // Real-time attendance status by shift
-  const today = new Date().toISOString().slice(0, 10);
   const currentAttendanceByShift = await Attendance.aggregate([
     { $match: { date: today } },
     { $group: { 

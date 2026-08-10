@@ -13,10 +13,10 @@ const attendanceSchema = new mongoose.Schema(
     method: { type: String, enum: ['qr_scan', 'manual', 'system'], default: 'manual' },
     shift: { type: String, trim: true, default: '' },
     seatCode: { type: String, trim: true, default: '' },
-    shiftType: { type: String, trim: default: '' }, // NEW: For shift-based validation
+    shiftType: { type: String, trim: true, default: '' }, // NEW: For shift-based validation
     markedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     notes: { type: String, trim: true, default: '' },
-    branch: { type: String, trim: default: '' },
+    branch: { type: String, trim: true, default: '' },
     isValidated: { type: Boolean, default: true }, // NEW: Whether shift validation passed
     validationMessage: { type: String, default: '' } // NEW: Validation message if failed
   },

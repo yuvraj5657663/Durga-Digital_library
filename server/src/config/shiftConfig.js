@@ -217,7 +217,7 @@ function getShiftEndTime(shiftType) {
   return shiftConfig ? shiftConfig.endTime : null;
 }
 
-module.exports = {
+export {
   SHIFT_CONFIG,
   validateCheckIn,
   validateCheckOut,
