@@ -1,4 +1,4 @@
-import { Client, LocalAuth } from 'whatsapp-web.js';
+import { Client } from 'whatsapp-web.js';
 import qrcode from 'qrcode-terminal';
 import config from '../config/index.js';
 import logger from '../config/logger.js';
@@ -13,9 +13,7 @@ export function setupWhatsApp() {
   }
 
   whatsappClient = new Client({
-    authStrategy: new LocalAuth({
-      clientId: 'durga-library-session'
-    }),
+    authStrategy: 'local',
     webVersionCache: {
       type: 'remote',
       remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html',
