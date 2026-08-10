@@ -5,6 +5,7 @@ import AuditLog from '../models/AuditLog.js';
 import userRepository from '../repositories/UserRepository.js';
 import config from '../config/index.js';
 import logger from '../config/logger.js';
+import { AuthenticationError } from '../utils/errors.js';
 
 function getEnvAdminUser() {
   return {
@@ -48,54 +49,75 @@ function signRefreshToken(user) {
 
 export async function login(username, password, ip, userAgent) {
   try {
-    const loginId = String(username).trim().toLowerCase();
+    // Normalise for DB lookup only — keep original for env-admin comparison
+    const loginId = String(username || '').trim().toLowerCase();
+    const rawUser = String(username || '').trim();
+    const rawPass = String(password || '');
+
+    const envAdminUser = String(config.admin.user || '').trim();
+    const envAdminPass = String(config.admin.pass || '').trim();
+
+    // Check env-admin FIRST using case-insensitive comparison
+    // This allows typing "Admin", "ADMIN", "admin" and still matching
+    const isEnvAdminLogin =
+      rawUser.toLowerCase() === envAdminUser.toLowerCase() &&
+      rawPass === envAdminPass;
+
+    // Look up user in DB (students + any DB-stored admins)
     let user = await userRepository.findByLoginId(loginId);
 
-    const envAdminUser = config.admin.user;
-    const envAdminPass = config.admin.pass;
-    const isEnvAdminLogin = username === envAdminUser && password === envAdminPass;
-
+    // If no DB user found but credentials match env-admin, use synthetic admin
     if (!user && isEnvAdminLogin) {
       user = getEnvAdminUser();
     }
 
     if (!user) {
-      throw new Error('Invalid credentials');
+      throw new AuthenticationError('Invalid credentials');
     }
 
-    const passwordValid = user.passwordHash
-      ? await bcrypt.compare(password, user.passwordHash)
-      : isEnvAdminLogin;
+    // Verify password:
+    //   • Real DB users  → bcrypt compare
+    //   • env-admin      → already verified above via isEnvAdminLogin
+    let passwordValid = false;
+    if (user._id === 'env-admin') {
+      passwordValid = isEnvAdminLogin;
+    } else if (user.passwordHash) {
+      passwordValid = await bcrypt.compare(rawPass, user.passwordHash);
+    } else {
+      passwordValid = false;
+    }
 
     if (!passwordValid) {
-      throw new Error('Invalid credentials');
+      throw new AuthenticationError('Invalid credentials');
     }
 
-    const accessToken = signAccessToken(user);
+    const accessToken  = signAccessToken(user);
     const refreshToken = signRefreshToken(user);
 
     if (user._id !== 'env-admin') {
       await AuditLog.create({
-        user: user._id,
-        action: 'login',
-        details: { ip, userAgent }
+        actorId:   user._id,
+        action:    'login',
+        actorRole: user.role,
+        actorName: user.username || user.name || '',
+        details:   { ip, userAgent }
       });
     }
 
     return {
       accessToken,
       refreshToken,
-      user: { 
-        id:         user._id.toString(), 
-        role:       user.role, 
-        username:   user.username, 
+      user: {
+        id:         user._id.toString(),
+        role:       user.role,
+        username:   user.username,
         email:      user.email,
         studentRef: user.studentRef ? user.studentRef.toString() : undefined,
         name:       user.name || user.username
       }
     };
   } catch (error) {
-    logger.error('Login Error:', error);
+    logger.error('Login Error:', error.message);
     throw error;
   }
 }
@@ -108,16 +130,18 @@ export async function refreshToken(refreshToken) {
       : await userRepository.findById(decoded.userId);
 
     if (!user) {
-      throw new Error('Invalid refresh token');
+      throw new AuthenticationError('Invalid refresh token');
     }
 
-    const accessToken = signAccessToken(user);
+    const accessToken  = signAccessToken(user);
     const nextRefreshToken = signRefreshToken(user);
-    
+
     return { accessToken, refreshToken: nextRefreshToken };
   } catch (error) {
-    logger.error('Refresh token error:', error);
-    throw error;
+    // Re-throw AuthenticationError and JWT errors as-is
+    if (error.statusCode) throw error;
+    logger.error('Refresh token error:', error.message);
+    throw new AuthenticationError('Invalid or expired refresh token');
   }
 }
 

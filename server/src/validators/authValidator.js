@@ -1,12 +1,13 @@
 import Joi from 'joi';
 
 export const loginSchema = Joi.object({
-  username: Joi.string().required().messages({
+  // Accept username / email / mobile — any non-empty string
+  username: Joi.string().trim().required().messages({
     'string.empty': 'Username is required',
     'any.required': 'Username is required'
   }),
-  password: Joi.string().min(6).required().messages({
-    'string.min': 'Password must be at least 6 characters',
+  // Remove min(6) — student passwords are server-generated hex strings of variable length
+  password: Joi.string().required().messages({
     'string.empty': 'Password is required',
     'any.required': 'Password is required'
   })

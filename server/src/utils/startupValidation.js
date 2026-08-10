@@ -24,10 +24,11 @@ export function validateEnvironment() {
     errors.push('JWT_SECRET must be at least 32 characters in production');
   }
 
-  // CORS validation in production
+  // CORS validation in production — warn but don't block startup
+  // (a missing ALLOWED_ORIGINS means all origins are allowed — acceptable for IP-only access)
   if (config.env === 'production') {
     if (config.cors.allowedOrigins.length === 0) {
-      errors.push('ALLOWED_ORIGINS must be set in production');
+      warnings.push('ALLOWED_ORIGINS not set — all origins allowed. Set it to your domain for security.');
     }
   }
 

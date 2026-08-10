@@ -14,19 +14,28 @@ const oneMonthLater = (() => {
 })();
 
 const schema = z.object({
-  name:        z.string().min(2, 'Name is required'),
-  mobile:      z.string().regex(/^\d{10}$/, '10-digit mobile required'),
-  email:       z.string().email('Invalid email').optional().or(z.literal('')),
-  preparation: z.string().optional(),
-  seatCode:    z.string().min(1, 'Seat code is required'),
-  shift:       z.string().min(1, 'Shift is required'),
-  shiftHours:  z.string().optional(),
-  joiningDate: z.string().min(1, 'Joining date required'),
-  expiryDate:  z.string().min(1, 'Expiry date required'),
-  duration:    z.string(),
-  fee:         z.coerce.number().min(0, 'Fee must be ≥ 0'),
-  paymentMode: z.string(),
-  branch:      z.string().optional(),
+  name:         z.string().min(2, 'Name is required'),
+  mobile:       z.string().regex(/^\d{10}$/, '10-digit mobile required'),
+  email:        z.string().email('Invalid email').optional().or(z.literal('')),
+  preparation:  z.string().optional(),
+  seatCode:     z.string().min(1, 'Seat code is required'),
+  shift:        z.string().min(1, 'Shift is required'),
+  shiftHours:   z.string().optional(),
+  customTiming: z.string().optional(),
+  joiningDate:  z.string().min(1, 'Joining date required'),
+  expiryDate:   z.string().min(1, 'Expiry date required'),
+  duration:     z.string(),
+  fee:          z.coerce.number().min(0, 'Fee must be ≥ 0'),
+  paymentMode:  z.string(),
+  branch:       z.string().optional(),
+}).refine((data) => {
+  if (data.shift === 'Custom' && !data.customTiming) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Custom timing is required when shift is Custom",
+  path: ["customTiming"]
 });
 
 export default function AddStudentModal({ open, onClose, onSuccess, selectedSeat }) {
@@ -37,14 +46,15 @@ export default function AddStudentModal({ open, onClose, onSuccess, selectedSeat
   } = useForm({
     resolver: zodResolver(schema),
     defaultValues: {
-      joiningDate: today,
-      expiryDate:  oneMonthLater,
-      duration:    '1 Month(s)',
-      fee:         400,
-      paymentMode: 'Cash',
-      shift:       'Shift 1',
-      shiftHours:  '6 AM - 12 PM (6 Hours)',
-      seatCode:    selectedSeat || '',
+      joiningDate:  today,
+      expiryDate:   oneMonthLater,
+      duration:     '1 Month(s)',
+      fee:          400,
+      paymentMode:  'Cash',
+      shift:        'Shift 1',
+      shiftHours:   '6 AM - 12 PM (6 Hours)',
+      customTiming: '',
+      seatCode:     selectedSeat || '',
     }
   });
 
@@ -58,6 +68,8 @@ export default function AddStudentModal({ open, onClose, onSuccess, selectedSeat
   // Auto-calculate expiry from joining + duration
   const joiningDate = watch('joiningDate');
   const duration    = watch('duration');
+  const shiftValue  = watch('shift');
+  const isCustomShift = shiftValue === 'Custom';
   useEffect(() => {
     if (!joiningDate || !duration) return;
     const months = parseInt(duration) || 1;
@@ -145,12 +157,29 @@ export default function AddStudentModal({ open, onClose, onSuccess, selectedSeat
                 <option value="Shift 2">Shift 2 (Afternoon)</option>
                 <option value="Shift 3">Shift 3 (Evening)</option>
                 <option value="Shift 4">Shift 4 (Full Day)</option>
+                <option value="Custom">Custom / Double Shift</option>
               </select>
             </div>
-            {/* Shift Hours */}
+            {/* Shift Hours or Custom Timing */}
             <div>
-              <label className="label">Shift Hours</label>
-              <input {...register('shiftHours')} className="input" placeholder="e.g. 6 AM - 12 PM" />
+              {isCustomShift ? (
+                <>
+                  <label className="label">Custom Timing *</label>
+                  <input
+                    {...register('customTiming')}
+                    className="input"
+                    placeholder="e.g. 06:00 AM - 11:00 AM & 04:00 PM - 09:00 PM"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">
+                    Enter both shifts separated by &amp; for double shift
+                  </p>
+                </>
+              ) : (
+                <>
+                  <label className="label">Shift Hours</label>
+                  <input {...register('shiftHours')} className="input" placeholder="e.g. 6 AM - 12 PM" />
+                </>
+              )}
             </div>
             {/* Duration */}
             <div>

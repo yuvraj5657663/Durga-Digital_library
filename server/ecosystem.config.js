@@ -2,40 +2,40 @@ module.exports = {
   apps: [
     {
       name: 'durga-library-server',
-      script: './dist/index.js',
-      instances: 'max',
-      exec_mode: 'cluster',
+      // Use src/index.js directly with --experimental-vm-modules for ESM
+      // OR point to dist/index.js after build — see deploy.sh
+      script: 'src/index.js',
+      interpreter: 'node',
+      interpreter_args: '--experimental-specifier-resolution=node',
+      instances: 1,           // Single instance — safer for WhatsApp session + cron
+      exec_mode: 'fork',      // Fork mode required for ES Modules + WhatsApp
       autorestart: true,
       watch: false,
-      max_memory_restart: '1G',
-      min_uptime: '10s',
-      max_restarts: 10,
-      restart_delay: 4000,
-      env: {
-        NODE_ENV: 'production',
-        PORT: 3000,
+      max_memory_restart: '512M',
+      min_uptime: '15s',
+      max_restarts: 5,
+      restart_delay: 5000,
+
+      env_production: {
+        NODE_ENV:    'production',
+        PORT:        3000,
+        HOST:        '0.0.0.0',  // Bind to all interfaces so Nginx can reach it
+
+        // ── These MUST be overridden in /etc/environment or passed via --env-file ──
+        // Do NOT hardcode secrets here. Set them with:
+        //   sudo nano /var/www/durga-library-system/server/.env
+        // Then run: pm2 start ecosystem.config.js --env production
       },
-      error_file: './logs/pm2-error.log',
-      out_file: './logs/pm2-out.log',
-      log_file: './logs/pm2-combined.log',
-      time: true,
-      merge_logs: true,
+
+      error_file:  './logs/pm2-error.log',
+      out_file:    './logs/pm2-out.log',
+      log_file:    './logs/pm2-combined.log',
+      time:        true,
+      merge_logs:  true,
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-      kill_timeout: 5000,
-      wait_ready: true,
-      listen_timeout: 10000,
+      kill_timeout:    5000,
+      listen_timeout:  30000,   // 30 s — allow time for MongoDB Atlas connection
       shutdown_with_message: true,
     },
   ],
-  deploy: {
-    production: {
-      user: 'node',
-      host: 'your-server-ip',
-      ref: 'origin/main',
-      repo: 'git@github.com:yourusername/durga-library-system.git',
-      path: '/var/www/durga-library-system',
-      'post-deploy': 'npm install && cd server && npm install && npm run build && pm2 reload ecosystem.config.js --env production',
-      'pre-setup': 'apt-get install git && apt-get install -y build-essential',
-    },
-  },
 };

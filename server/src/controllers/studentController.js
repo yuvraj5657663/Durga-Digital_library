@@ -41,9 +41,18 @@ export const createStudentController = asyncHandler(async (req, res) => {
     throw new ValidationError('name and mobile are required');
   }
 
-  // Check duplicate mobile
-  const existing = await Student.findOne({ mobile: body.mobile });
-  if (existing) throw new ConflictError('A student with this mobile number already exists');
+  // Check duplicate: same seatCode + shift combo only (not same mobile)
+  // A student CAN register with the same mobile for a different shift/seat
+  if (body.seatCode && body.shift) {
+    const seatConflict = await Student.findOne({
+      seatCode: body.seatCode,
+      shift:    body.shift,
+      status:   'Active'
+    });
+    if (seatConflict) {
+      throw new ConflictError(`Seat ${body.seatCode} is already booked for ${body.shift}`);
+    }
+  }
 
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -65,6 +74,7 @@ export const createStudentController = asyncHandler(async (req, res) => {
       studentId,
       qrCodeUrl:       qrDataUrl,
       status:          'Active',
+      customTiming:    body.customTiming || '',
       normalizedMobile: body.mobile.replace(/\D/g, '').length === 10
         ? `91${body.mobile.replace(/\D/g, '')}`
         : body.mobile.replace(/\D/g, '')
@@ -163,6 +173,10 @@ export const createStudentController = asyncHandler(async (req, res) => {
     );
 
     // 10. WhatsApp + Email welcome with credentials
+    const timingDisplay = (body.shift === 'Custom' || body.shift === 'Double Shift')
+      ? (body.customTiming || body.shiftHours || body.shift)
+      : body.shift;
+
     const admissionMsg =
       `DURGA DIGITAL LIBRARY, MUNGER 📚
 📍 Location: Kalarampur, Near Shiv Mandir, NH-80, Munger - 811211
@@ -172,7 +186,7 @@ Namaste ${body.name},
 Aapka admission successfully confirm ho gaya hai!
 
 📌 Seat Code: ${body.seatCode}
-⏰ Shift: ${body.shift}
+⏰ Shift / Timing: ${timingDisplay}
 📅 Joining Date: ${startDate}
 ⏳ Expiry Date: ${expiryDate}
 💰 Fee Paid: ₹${body.fee}
@@ -183,7 +197,7 @@ Aapka admission successfully confirm ho gaya hai!
 ✔️ 🎥 24x7 CCTV Camera Surveillance
 ✔️ 🧼 Clean & Separate Washrooms
 ✔️ 💧 RO Mineral Water
-✔️ �  High-Speed Free Wi-Fi
+✔️ 🌐 High-Speed Free Wi-Fi
 ✔️ ❄️ Fully Air-Conditioned (AC)
 ✔️ ⚡ Uninterrupted Power Backup
 
@@ -273,25 +287,87 @@ export const updateStudentController = asyncHandler(async (req, res) => {
   return successResponse(res, student, 'Student updated successfully');
 });
 
-// ─── DELETE /admin/students/:id ──────────────────────────────────────────────
+// ─── DELETE /admin/students/:id — HARD CASCADE DELETE ──────────────────────
 export const deactivateStudentController = asyncHandler(async (req, res) => {
-  const { id }  = req.params;
-  const student = await studentRepository.deactivateStudent(id);
-  if (!student) throw new NotFoundError('Student not found');
-
-  // Free seat
-  if (student.seatCode && student.shift) {
-    const shiftNum = parseInt(String(student.shift).replace(/[^0-9]/g, '')) || 1;
-    const seatKey  = `s_${parseInt(student.seatCode.replace(/\D/g, ''), 10)}_shift_${shiftNum}`;
-    await Seat.deleteOne({ seat_key: seatKey });
+  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    throw new ValidationError('Invalid student id.');
   }
 
-  await AuditLog.create({
-    action: 'student_deactivated', actorId: toActorId(req.user.id), actorRole: req.user.role,
-    actorName: req.user.username, targetType: 'Student', targetId: id, targetName: student.name
-  });
+  const student = await Student.findById(id);
+  if (!student) throw new NotFoundError('Student not found');
 
-  return successResponse(res, student, 'Student deactivated successfully');
+  // Run all cascade deletes in a single transaction so they're atomic
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    // 1. Free seat in Seat matrix
+    if (student.seatCode && student.shift) {
+      const shiftNum = parseInt(String(student.shift).replace(/[^0-9]/g, '')) || 1;
+      const seatKey  = `s_${parseInt(student.seatCode.replace(/\D/g, ''), 10)}_shift_${shiftNum}`;
+      await Seat.deleteOne({ seat_key: seatKey }, { session });
+    }
+
+    // 2. Delete all payments for this student
+    await Payment.deleteMany({ student: student._id }, { session });
+
+    // 3. Delete all memberships for this student
+    await Membership.deleteMany({ student: student._id }, { session });
+
+    // 4. Delete all attendance records for this student
+    await Attendance.deleteMany({ student: student._id }, { session });
+
+    // 5. Unlink admission request (mark as deleted, keep record for audit)
+    //    We update rather than delete to preserve the inquiry audit trail
+    await mongoose.model('AdmissionRequest').updateMany(
+      { studentRef: student._id },
+      { $unset: { studentRef: '' }, $set: { admission_status: 'Accepted' } },
+      { session }
+    );
+
+    // 6. Delete linked User account
+    if (student.userRef) {
+      await User.deleteOne({ _id: student.userRef }, { session });
+    }
+
+    // 7. Hard delete the Student document itself
+    await Student.deleteOne({ _id: student._id }, { session });
+
+    // 8. Audit log
+    await AuditLog.create([{
+      action:    'student_hard_deleted',
+      actorId:   toActorId(req.user.id),
+      actorRole: req.user.role,
+      actorName: req.user.username,
+      targetType:'Student',
+      targetId:  id,
+      targetName:student.name,
+      details: {
+        seatCode:  student.seatCode,
+        shift:     student.shift,
+        studentId: student.studentId,
+        mobile:    student.mobile,
+        cascade:   ['seat', 'payments', 'memberships', 'attendance', 'user']
+      },
+      ip: req.ip,
+      userAgent: req.headers['user-agent'] || ''
+    }], { session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return successResponse(res, {
+      deletedId: id,
+      name: student.name,
+      seatCode: student.seatCode
+    }, `Student "${student.name}" and all linked records permanently deleted.`);
+
+  } catch (err) {
+    await session.abortTransaction();
+    session.endSession();
+    throw err;
+  }
 });
 
 // ─── GET /admin/stats ────────────────────────────────────────────────────────

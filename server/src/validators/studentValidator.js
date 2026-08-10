@@ -21,8 +21,14 @@ export const createStudentSchema = Joi.object({
   paymentMode: Joi.string().allow('').trim(),
   shift: Joi.string().allow('').trim(),
   shiftHours: Joi.string().allow('').trim(),
+  customTiming: Joi.string().allow('').trim(),
   branch: Joi.string().allow('').trim(),
   seatCode: Joi.string().allow('').trim()
+}).custom((value, helpers) => {
+  if (value.shift === 'Custom' && !value.customTiming) {
+    return helpers.error('any.custom', { message: 'Custom timing is required when shift is Custom' });
+  }
+  return value;
 });
 
 export const updateStudentSchema = Joi.object({
@@ -41,10 +47,16 @@ export const updateStudentSchema = Joi.object({
   paymentMode: Joi.string().allow('').trim(),
   shift: Joi.string().allow('').trim(),
   shiftHours: Joi.string().allow('').trim(),
+  customTiming: Joi.string().allow('').trim(),
   branch: Joi.string().allow('').trim(),
   seatCode: Joi.string().allow('').trim(),
   status: Joi.string().valid('Active', 'Inactive', 'Expired')
-}).min(1);
+}).min(1).custom((value, helpers) => {
+  if (value.shift === 'Custom' && !value.customTiming) {
+    return helpers.error('any.custom', { message: 'Custom timing is required when shift is Custom' });
+  }
+  return value;
+});
 
 export const studentIdSchema = Joi.object({
   id: Joi.string().required().messages({

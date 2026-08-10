@@ -40,8 +40,10 @@ function ApproveDrawer({ admission, onClose, onSuccess }) {
     }
   });
 
-  const joiningDate = watch('joiningDate');
-  const duration    = watch('duration');
+  const joiningDate  = watch('joiningDate');
+  const duration     = watch('duration');
+  const shiftValue   = watch('shift');
+  const isCustomShift = shiftValue === 'Custom';
   useEffect(() => {
     const months = parseInt(duration) || 1;
     const d = new Date(joiningDate);
@@ -93,7 +95,9 @@ function ApproveDrawer({ admission, onClose, onSuccess }) {
               <div>
                 <label className="label">Shift *</label>
                 <select {...register('shift')} className="input">
-                  {['Shift 1','Shift 2','Shift 3','Shift 4'].map(s => <option key={s} value={s}>{s}</option>)}
+                  {['Shift 1','Shift 2','Shift 3','Shift 4','Custom'].map(s => (
+                    <option key={s} value={s}>{s === 'Custom' ? 'Custom / Double Shift' : s}</option>
+                  ))}
                 </select>
               </div>
               <div>
@@ -120,6 +124,17 @@ function ApproveDrawer({ admission, onClose, onSuccess }) {
               <label className="label">Shift Hours</label>
               <input {...register('shiftHours')} className="input" placeholder="e.g. 6 AM - 12 PM" />
             </div>
+            {isCustomShift && (
+              <div>
+                <label className="label">Custom Timing *</label>
+                <input
+                  {...register('customTiming')}
+                  className="input"
+                  placeholder="e.g. 06:00 AM - 11:00 AM & 04:00 PM - 09:00 PM"
+                />
+                <p className="text-xs text-gray-400 mt-1">Separate two shifts with &amp;</p>
+              </div>
+            )}
           </form>
 
           <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-800">

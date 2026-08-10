@@ -131,15 +131,21 @@ export async function sendRenewalReminder({ student, daysLeft }) {
 
 export async function sendMembershipActivated({ student, membership }) {
   const title = '✅ Admission Confirmed';
+
+  // Use custom timing string when shift is 'Custom' or 'Double Shift'
+  const timingDisplay = (student.shift === 'Custom' || student.shift === 'Double Shift')
+    ? (student.customTiming || student.shiftHours || student.shift)
+    : (student.shift || '');
+
   const body = `DURGA DIGITAL LIBRARY, MUNGER 📚
 📍 Location: Kalarampur, Near Shiv Mandir, NH-80, Munger - 811211
-📞 Contact Person: Saurav Kumar (7424893960)
+📞 Contact Person: Saurav Kumar (7542893960)
 
 Namaste ${student.name},
 Aapka admission successfully confirm ho gaya hai!
 
 📌 Seat Code: ${student.seatCode}
-⏰ Shift: ${student.shift}
+⏰ Shift / Timing: ${timingDisplay}
 📅 Joining Date: ${student.joiningDate}
 ⏳ Expiry Date: ${student.expiryDate}
 💰 Fee Paid: ₹${student.fee}

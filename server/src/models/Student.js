@@ -17,6 +17,7 @@ const studentSchema = new mongoose.Schema(
     paymentMode: { type: String, default: 'Cash' },
     shift: { type: String, trim: true, default: 'Shift 1' },
     shiftHours: { type: String, trim: true, default: '' },
+    customTiming: { type: String, trim: true, default: '' },
     status: { type: String, enum: ['Active', 'Inactive', 'Expired'], default: 'Active' },
     branch: { type: String, trim: true, default: '' },
     userRef: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

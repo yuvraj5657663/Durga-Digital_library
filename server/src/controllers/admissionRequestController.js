@@ -196,6 +196,7 @@ export const approveAdmissionRequestController = asyncHandler(async (req, res) =
       fee:             parseFloat(fee),
       shift,
       shiftHours:      shiftHours || '',
+      customTiming:    approvalDetails.customTiming || '',
       status:          'Active'
     };
 
@@ -289,6 +290,10 @@ export const approveAdmissionRequestController = asyncHandler(async (req, res) =
     session.endSession();
 
     // Post-commit notifications (non-blocking)
+    const timingDisplay = (shift === 'Custom' || shift === 'Double Shift')
+      ? (approvalDetails.customTiming || shiftHours || shift)
+      : shift;
+
     const credMsg =
       `*DURGA DIGITAL LIBRARY — Admission Approved!* 📚\n\n` +
       `Namaste *${admissionRequest.name}*,\n\n` +
@@ -296,7 +301,7 @@ export const approveAdmissionRequestController = asyncHandler(async (req, res) =
       `*Student Portal Login Credentials:*\n` +
       `🆔 Student ID / Username: *${studentId}*\n` +
       `🔑 Password: *${password}*\n\n` +
-      `📌 Seat: ${seatCode} | Shift: ${shift}\n` +
+      `📌 Seat: ${seatCode} | Shift / Timing: ${timingDisplay}\n` +
       `📅 Valid Until: ${expiryDate}\n\n` +
       `Portal: ${config.app.url || 'http://localhost:5173'}/student\n\n` +
       `Durga Digital Library, Munger\nContact: 7542893960`;
