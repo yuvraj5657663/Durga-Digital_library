@@ -6,7 +6,9 @@ import { generateAdmissionReceipt } from './pdfService.js';
 import { hasShiftEnded, getShiftEndTime, SHIFT_CONFIG } from '../config/shiftConfig.js';
 
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: config.email.host,
+  port: config.email.port,
+  secure: false,
   auth: {
     user: config.email.user,
     pass: config.email.pass
@@ -14,19 +16,34 @@ const transporter = nodemailer.createTransport({
 });
 
 async function sendEmail({ to, subject, text, html, attachments = [] }) {
-  const from = config.email.user;
+  const from = config.email.from || config.email.user;
   if (!to || !from) return { sent: false, reason: !to ? 'no_recipient' : 'no_sender' };
+  
+  // Validate email configuration before sending
+  if (!config.email.user || !config.email.pass) {
+    console.error('[notificationService] Email not configured: Missing EMAIL_USER or EMAIL_PASS');
+    return { sent: false, reason: 'email_not_configured' };
+  }
+  
   try {
     const info = await transporter.sendMail({ 
-      from: `Durga Digital Library <${from}>`, 
+      from, 
       to, 
       subject, 
       text, 
       html, 
       attachments 
     });
+    console.log(`[notificationService] Email sent successfully to ${to} - MessageID: ${info.messageId}`);
     return { sent: true, messageId: info.messageId };
   } catch (err) {
+    console.error(`[notificationService] Email failed to send to ${to}:`, err.message);
+    console.error('[notificationService] Email error details:', {
+      code: err.code,
+      command: err.command,
+      responseCode: err.responseCode,
+      response: err.response
+    });
     logger.error('[notificationService] email error:', err.message);
     return { sent: false, reason: err.message };
   }
@@ -41,14 +58,18 @@ function normalizeMobile(mobile) {
 async function sendWhatsApp(mobile, message) {
   const client = global.whatsappClient;
   if (!client || !client.info || !client.info.wid) {
+    console.error('[notificationService] WhatsApp not ready: Client not initialized or authenticated');
     return { sent: false, reason: 'whatsapp_not_ready' };
   }
   if (!mobile) return { sent: false, reason: 'no_mobile' };
+  
   try {
     const wid = `${normalizeMobile(mobile)}@c.us`;
     await client.sendMessage(wid, message);
+    console.log(`[notificationService] WhatsApp sent successfully to ${wid}`);
     return { sent: true };
   } catch (err) {
+    console.error(`[notificationService] WhatsApp failed to send to ${mobile}:`, err.message);
     logger.error('[notificationService] whatsapp error:', err.message);
     return { sent: false, reason: err.message };
   }
@@ -91,7 +112,9 @@ export async function send(opts = {}) {
         content: receiptBuffer,
         contentType: 'application/pdf'
       };
+      console.log(`[notificationService] PDF receipt generated for seat ${studentData.seatCode}`);
     } catch (err) {
+      console.error('[notificationService] PDF generation error:', err.message);
       logger.error('[notificationService] PDF generation error:', err.message);
     }
   }

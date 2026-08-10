@@ -36,10 +36,15 @@ export const config = {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
     from: process.env.EMAIL_FROM || 'Durga Library <noreply@durgalibrary.com>',
+    host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+    port: parseInt(process.env.EMAIL_PORT, 10) || 587,
   },
   
   whatsapp: {
-    disabled: true, // Disabled for development
+    disabled: process.env.WHATSAPP_ENABLED === 'false' || 
+              process.env.WHATSAPP_ENABLED === false ||
+              process.env.DISABLE_WHATSAPP === 'true' ||
+              !process.env.WHATSAPP_ENABLED,
   },
   
   cors: {

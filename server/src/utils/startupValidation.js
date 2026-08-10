@@ -35,6 +35,19 @@ export function validateEnvironment() {
   // Email configuration
   if (!config.email.user || !config.email.pass) {
     warnings.push('Email service not configured - email features will be disabled');
+  } else {
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(config.email.user)) {
+      errors.push(`Invalid EMAIL_USER format: ${config.email.user}`);
+    }
+    // Validate SMTP port (AWS blocks 25, must use 587 or 465)
+    if (config.email.port === 25) {
+      errors.push('EMAIL_PORT 25 is blocked by AWS. Use 587 (TLS) or 465 (SSL)');
+    }
+    if (config.email.port !== 587 && config.email.port !== 465) {
+      warnings.push(`EMAIL_PORT ${config.email.port} is non-standard. Recommended: 587 (TLS) or 465 (SSL)`);
+    }
   }
 
   // WhatsApp configuration
