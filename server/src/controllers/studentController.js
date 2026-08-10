@@ -82,18 +82,32 @@ export const createStudentController = asyncHandler(async (req, res) => {
 
     // 4. Upsert Seat
     if (body.seatCode && body.shift) {
-      const shiftNum = parseInt(String(body.shift).replace(/[^0-9]/g, '')) || 1;
+      // Map shift names to shift keys for the seat matrix
+      const shiftMapping = {
+        'Shift 1': 'Shift 1',
+        'Shift 2': 'Shift 2', 
+        'Shift 3': 'Shift 3',
+        'Shift 4': 'Shift 4',
+        'Night Shift': 'Night Shift',
+        'Custom': 'Custom'
+      };
+      
+      const shiftValue = shiftMapping[body.shift] || body.shift;
+      const seatKey = `s_${parseInt(body.seatCode.replace(/\D/g, ''), 10)}_${shiftValue}`;
+      
       await Seat.findOneAndUpdate(
-        { seat_key: `s_${parseInt(body.seatCode.replace(/\D/g, ''), 10)}_shift_${shiftNum}` },
+        { seat_key: seatKey },
         {
-          seat_key:    `s_${parseInt(body.seatCode.replace(/\D/g, ''), 10)}_shift_${shiftNum}`,
+          seat_key:    seatKey,
           seat_number: parseInt(body.seatCode.replace(/\D/g, ''), 10),
-          shift:       shiftNum,
+          shift:       shiftValue,
+          shift_name:  body.shift,
           is_booked:   1,
-          student_name:body.name,
+          student_name: body.name,
           mobile:      body.mobile,
           preparation: body.preparation || '',
-          expiry_date: body.expiryDate  || ''
+          expiry_date: body.expiryDate || '',
+          custom_timing: body.customTiming || ''
         },
         { upsert: true, session }
       );
@@ -173,7 +187,7 @@ export const createStudentController = asyncHandler(async (req, res) => {
     );
 
     // 10. WhatsApp + Email welcome with credentials
-    const timingDisplay = (body.shift === 'Custom' || body.shift === 'Double Shift')
+    const timingDisplay = (body.shift === 'Custom' || body.shift === 'Double Shift' || body.shift === 'Night Shift')
       ? (body.customTiming || body.shiftHours || body.shift)
       : body.shift;
 
@@ -304,8 +318,18 @@ export const deactivateStudentController = asyncHandler(async (req, res) => {
   try {
     // 1. Free seat in Seat matrix
     if (student.seatCode && student.shift) {
-      const shiftNum = parseInt(String(student.shift).replace(/[^0-9]/g, '')) || 1;
-      const seatKey  = `s_${parseInt(student.seatCode.replace(/\D/g, ''), 10)}_shift_${shiftNum}`;
+      // Map shift names to shift keys for the seat matrix
+      const shiftMapping = {
+        'Shift 1': 'Shift 1',
+        'Shift 2': 'Shift 2', 
+        'Shift 3': 'Shift 3',
+        'Shift 4': 'Shift 4',
+        'Night Shift': 'Night Shift',
+        'Custom': 'Custom'
+      };
+      
+      const shiftValue = shiftMapping[student.shift] || student.shift;
+      const seatKey = `s_${parseInt(student.seatCode.replace(/\D/g, ''), 10)}_${shiftValue}`;
       await Seat.deleteOne({ seat_key: seatKey }, { session });
     }
 

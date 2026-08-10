@@ -4,10 +4,12 @@ import { Armchair, Users, AlertTriangle } from 'lucide-react';
 import api from '../../services/api';
 
 const SHIFTS = [
-  { value: 1, label: 'Shift 1 — Morning (6 AM – 11 AM)' },
-  { value: 2, label: 'Shift 2 — Afternoon (11 AM – 4 PM)' },
-  { value: 3, label: 'Shift 3 — Evening (4 PM – 9 PM)' },
-  { value: 4, label: 'Shift 4 — Full Day' },
+  { value: 'Shift 1', label: 'Shift 1 — Morning (6 AM – 11 AM)' },
+  { value: 'Shift 2', label: 'Shift 2 — Afternoon (11 AM – 4 PM)' },
+  { value: 'Shift 3', label: 'Shift 3 — Evening (4 PM – 9 PM)' },
+  { value: 'Shift 4', label: 'Shift 4 — Full Day' },
+  { value: 'Night Shift', label: 'Night Shift (9 PM – 6 AM)' },
+  { value: 'Custom', label: 'Custom Shift' },
 ];
 
 function getSeatStyle(seat) {
@@ -38,8 +40,8 @@ function SeatButton({ seat, onClick }) {
           ${getSeatStyle(seat)}
         `}
         title={seat.is_booked
-          ? `${seat.seat_code} — ${seat.student_name || 'Booked'} (Exp: ${seat.expiry_date || '?'})`
-          : `${seat.seat_code} — Available`}
+          ? `${seat.seat_code} — ${seat.student_name || 'Booked'} (${seat.shift_name || seat.shift}) Exp: ${seat.expiry_date || '?'}`
+          : `${seat.seat_code} — Available (${seat.shift_name || seat.shift})`}
       >
         <Armchair className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
         <span className="text-[9px] sm:text-[10px] font-bold leading-none truncate w-full text-center px-0.5">
@@ -55,9 +57,11 @@ function SeatButton({ seat, onClick }) {
           {seat.is_booked
             ? <>
                 <p className="text-gray-300">{seat.student_name || 'Booked'}</p>
+                <p className="text-gray-400">Shift: {seat.shift_name || seat.shift}</p>
+                {seat.custom_timing && <p className="text-purple-300">Timing: {seat.custom_timing}</p>}
                 {seat.expiry_date && <p className="text-gray-400">Exp: {seat.expiry_date}</p>}
               </>
-            : <p className="text-emerald-300">Available</p>}
+            : <p className="text-emerald-300">Available ({seat.shift_name || seat.shift})</p>}
           {/* Arrow */}
           <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
         </div>
@@ -67,7 +71,7 @@ function SeatButton({ seat, onClick }) {
 }
 
 export default function SeatMatrixGrid({ onSeatClick }) {
-  const [shift, setShift] = useState(1);
+  const [shift, setShift] = useState('Shift 1');
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin', 'seats', shift],
@@ -132,7 +136,7 @@ export default function SeatMatrixGrid({ onSeatClick }) {
             <label className="text-sm font-medium text-gray-600 whitespace-nowrap">Select Shift:</label>
             <select
               value={shift}
-              onChange={e => setShift(Number(e.target.value))}
+              onChange={e => setShift(e.target.value)}
               className="input !py-1.5 !px-2.5 text-sm w-auto"
             >
               {SHIFTS.map(s => (

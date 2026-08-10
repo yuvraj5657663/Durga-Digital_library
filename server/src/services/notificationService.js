@@ -132,8 +132,8 @@ export async function sendRenewalReminder({ student, daysLeft }) {
 export async function sendMembershipActivated({ student, membership }) {
   const title = '✅ Admission Confirmed';
 
-  // Use custom timing string when shift is 'Custom' or 'Double Shift'
-  const timingDisplay = (student.shift === 'Custom' || student.shift === 'Double Shift')
+  // Use custom timing string when shift is 'Custom', 'Double Shift', or 'Night Shift'
+  const timingDisplay = (student.shift === 'Custom' || student.shift === 'Double Shift' || student.shift === 'Night Shift')
     ? (student.customTiming || student.shiftHours || student.shift)
     : (student.shift || '');
 

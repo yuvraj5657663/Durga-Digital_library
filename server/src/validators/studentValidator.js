@@ -25,8 +25,13 @@ export const createStudentSchema = Joi.object({
   branch: Joi.string().allow('').trim(),
   seatCode: Joi.string().allow('').trim()
 }).custom((value, helpers) => {
+  // Custom validation: require customTiming when shift is 'Custom'
   if (value.shift === 'Custom' && !value.customTiming) {
     return helpers.error('any.custom', { message: 'Custom timing is required when shift is Custom' });
+  }
+  // Custom validation: require shiftHours when shift is 'Night Shift'
+  if (value.shift === 'Night Shift' && !value.shiftHours) {
+    return helpers.error('any.custom', { message: 'Shift hours are required when shift is Night Shift' });
   }
   return value;
 });
@@ -52,8 +57,13 @@ export const updateStudentSchema = Joi.object({
   seatCode: Joi.string().allow('').trim(),
   status: Joi.string().valid('Active', 'Inactive', 'Expired')
 }).min(1).custom((value, helpers) => {
+  // Custom validation: require customTiming when shift is 'Custom'
   if (value.shift === 'Custom' && !value.customTiming) {
     return helpers.error('any.custom', { message: 'Custom timing is required when shift is Custom' });
+  }
+  // Custom validation: require shiftHours when shift is 'Night Shift'
+  if (value.shift === 'Night Shift' && !value.shiftHours) {
+    return helpers.error('any.custom', { message: 'Shift hours are required when shift is Night Shift' });
   }
   return value;
 });

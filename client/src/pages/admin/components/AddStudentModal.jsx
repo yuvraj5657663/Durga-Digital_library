@@ -29,7 +29,12 @@ const schema = z.object({
   paymentMode:  z.string(),
   branch:       z.string().optional(),
 }).refine((data) => {
+  // Custom validation: require customTiming when shift is 'Custom'
   if (data.shift === 'Custom' && !data.customTiming) {
+    return false;
+  }
+  // Custom validation: require shiftHours when shift is 'Night Shift'
+  if (data.shift === 'Night Shift' && !data.shiftHours) {
     return false;
   }
   return true;
@@ -70,6 +75,7 @@ export default function AddStudentModal({ open, onClose, onSuccess, selectedSeat
   const duration    = watch('duration');
   const shiftValue  = watch('shift');
   const isCustomShift = shiftValue === 'Custom';
+  const isNightShift = shiftValue === 'Night Shift';
   useEffect(() => {
     if (!joiningDate || !duration) return;
     const months = parseInt(duration) || 1;
@@ -153,10 +159,11 @@ export default function AddStudentModal({ open, onClose, onSuccess, selectedSeat
             <div>
               <label className="label">Shift *</label>
               <select {...register('shift')} className="input">
-                <option value="Shift 1">Shift 1 (Morning)</option>
-                <option value="Shift 2">Shift 2 (Afternoon)</option>
-                <option value="Shift 3">Shift 3 (Evening)</option>
+                <option value="Shift 1">Shift 1 (Morning 6 AM - 11 AM)</option>
+                <option value="Shift 2">Shift 2 (Afternoon 11 AM - 4 PM)</option>
+                <option value="Shift 3">Shift 3 (Evening 4 PM - 9 PM)</option>
                 <option value="Shift 4">Shift 4 (Full Day)</option>
+                <option value="Night Shift">Night Shift (9 PM - 6 AM)</option>
                 <option value="Custom">Custom / Double Shift</option>
               </select>
             </div>
@@ -171,13 +178,14 @@ export default function AddStudentModal({ open, onClose, onSuccess, selectedSeat
                     placeholder="e.g. 06:00 AM - 11:00 AM & 04:00 PM - 09:00 PM"
                   />
                   <p className="text-xs text-gray-400 mt-1">
-                    Enter both shifts separated by &amp; for double shift
+                    Enter both shifts separated by & for double shift
                   </p>
                 </>
               ) : (
                 <>
                   <label className="label">Shift Hours</label>
-                  <input {...register('shiftHours')} className="input" placeholder="e.g. 6 AM - 12 PM" />
+                  <input {...register('shiftHours')} className="input" placeholder={isNightShift ? "e.g. 9 PM - 6 AM" : "e.g. 6 AM - 12 PM"} />
+                  {isNightShift && <p className="text-xs text-gray-400 mt-1">Night Shift typically runs 9 PM - 6 AM</p>}
                 </>
               )}
             </div>

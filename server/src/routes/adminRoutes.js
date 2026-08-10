@@ -23,7 +23,7 @@ router.get('/dashboard-stats', studentController.getDashboardStatsController);
 // Booked seats come from DB; missing numbers are filled as vacant.
 router.get('/seats', async (req, res) => {
   try {
-    const shift = parseInt(req.query.shift, 10) || 1;
+    const shift = req.query.shift || 'Shift 1'; // Default to Shift 1
 
     const bookedSeats = await Seat.find({ shift }).lean();
     const bookedMap   = {};
@@ -43,6 +43,8 @@ router.get('/seats', async (req, res) => {
           preparation:  booked.preparation   || '',
           expiry_date:  booked.expiry_date   || '',
           shift,
+          shift_name:  booked.shift_name || shift,
+          custom_timing: booked.custom_timing || ''
         });
       } else {
         seatArray.push({
@@ -54,6 +56,8 @@ router.get('/seats', async (req, res) => {
           preparation:  '',
           expiry_date:  '',
           shift,
+          shift_name: shift,
+          custom_timing: ''
         });
       }
     }

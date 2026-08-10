@@ -203,18 +203,32 @@ export const approveAdmissionRequestController = asyncHandler(async (req, res) =
     const [createdStudent] = await Student.create([studentData], { session });
 
     // Upsert seat
-    const shiftNum = parseInt(String(shift).replace(/[^0-9]/g, '')) || 1;
+    // Map shift names to shift keys for the seat matrix
+    const shiftMapping = {
+      'Shift 1': 'Shift 1',
+      'Shift 2': 'Shift 2', 
+      'Shift 3': 'Shift 3',
+      'Shift 4': 'Shift 4',
+      'Night Shift': 'Night Shift',
+      'Custom': 'Custom'
+    };
+    
+    const shiftValue = shiftMapping[shift] || shift;
+    const seatKey = `s_${parseInt(seatCode.replace(/\D/g, ''), 10)}_${shiftValue}`;
+    
     await Seat.findOneAndUpdate(
-      { seat_key: `s_${parseInt(seatCode.replace(/\D/g, ''), 10)}_shift_${shiftNum}` },
+      { seat_key: seatKey },
       {
-        seat_key:    `s_${parseInt(seatCode.replace(/\D/g, ''), 10)}_shift_${shiftNum}`,
+        seat_key:    seatKey,
         seat_number: parseInt(seatCode.replace(/\D/g, ''), 10),
-        shift:       shiftNum,
+        shift:       shiftValue,
+        shift_name:  shift,
         is_booked:   1,
-        student_name:admissionRequest.name,
+        student_name: admissionRequest.name,
         mobile:      admissionRequest.mobile,
         preparation: admissionRequest.preparation || '',
-        expiry_date: expiryDate
+        expiry_date: expiryDate,
+        custom_timing: customTiming || ''
       },
       { upsert: true, session }
     );
@@ -290,7 +304,7 @@ export const approveAdmissionRequestController = asyncHandler(async (req, res) =
     session.endSession();
 
     // Post-commit notifications (non-blocking)
-    const timingDisplay = (shift === 'Custom' || shift === 'Double Shift')
+    const timingDisplay = (shift === 'Custom' || shift === 'Double Shift' || shift === 'Night Shift')
       ? (approvalDetails.customTiming || shiftHours || shift)
       : shift;
 
