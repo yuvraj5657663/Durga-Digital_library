@@ -39,19 +39,21 @@ async function startServer() {
     await database.connect();
     logger.info('Database connected successfully');
 
-    // Setup WhatsApp
-    setupWhatsApp();
-
-    // Start cron jobs
-    startCronJobs();
-
-    // Start server
+    // Start server first to keep process alive
     const server = app.listen(config.port, config.host, () => {
       logger.info(`🚀 Server running on ${config.host}:${config.port}`);
       logger.info(`📚 ${config.app.name}`);
       logger.info(`🌍 Environment: ${config.env}`);
       logger.info(`🏥 Health check: http://${config.host}:${config.port}/health`);
     });
+
+    // Setup WhatsApp AFTER server is listening (keeps process alive)
+    setupWhatsApp().catch(err => {
+      logger.error('WhatsApp setup failed (continuing without WhatsApp):', err.message);
+    });
+
+    // Start cron jobs
+    startCronJobs();
 
     // Graceful shutdown
     const gracefulShutdown = async (signal) => {
