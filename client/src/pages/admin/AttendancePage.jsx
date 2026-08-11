@@ -106,10 +106,20 @@ export default function AttendancePage() {
   };
 
   const handleCheckout = (attendance) => {
+    console.log('Checkout attendance record:', attendance);
     if (!window.confirm(`Check out ${attendance.student?.name || 'student'}?`)) return;
-    checkoutMutation.mutate({
-      attendanceId: attendance.id || attendance._id,
-    });
+    
+    // Try to use attendanceId first, fallback to studentId
+    const payload = {};
+    if (attendance.id || attendance._id) {
+      payload.attendanceId = attendance.id || attendance._id;
+    }
+    if (attendance.student?._id || attendance.student) {
+      payload.studentId = attendance.student._id || attendance.student;
+    }
+    
+    console.log('Checkout payload:', payload);
+    checkoutMutation.mutate(payload);
   };
 
   const markBulkPresent = () => {
@@ -210,8 +220,9 @@ export default function AttendancePage() {
                       const sid  = s._id || s.id;
                       const rec  = attMap[String(sid)];
                       const isPresent = !!rec?.checkIn;
-                      const isCheckedIn = rec?.status === 'CHECKED_IN';
-                      const isCheckedOut = rec?.status === 'CHECKED_OUT';
+                      // Check status field first, then fallback to checkIn/checkOut logic
+                      const isCheckedIn = rec?.status === 'CHECKED_IN' || (rec?.checkIn && !rec?.checkOut);
+                      const isCheckedOut = rec?.status === 'CHECKED_OUT' || (rec?.checkIn && rec?.checkOut);
                       return (
                         <tr key={sid} className={`hover:bg-gray-50 ${isPresent ? 'bg-green-50/30' : ''}`}>
                           <td className="px-4 py-3 font-mono text-xs text-gray-500">{s.seatCode || '—'}</td>

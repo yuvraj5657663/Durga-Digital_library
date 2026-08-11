@@ -248,6 +248,8 @@ export const getAttendanceStatsController = asyncHandler(async (req, res) => {
 export const checkoutAttendanceController = asyncHandler(async (req, res) => {
   const { attendanceId, studentId } = req.body;
 
+  console.log('Checkout request:', { attendanceId, studentId });
+
   if (!attendanceId && !studentId) {
     throw new ValidationError('Either attendanceId or studentId is required');
   }
@@ -264,6 +266,8 @@ export const checkoutAttendanceController = asyncHandler(async (req, res) => {
     attendance = await Attendance.findOne({ student: studentId, date });
     if (!attendance) throw new NotFoundError('No attendance record found for today');
   }
+
+  console.log('Found attendance:', attendance);
 
   if (!attendance.checkIn) {
     throw new ValidationError('Student has not checked in yet');
@@ -283,6 +287,8 @@ export const checkoutAttendanceController = asyncHandler(async (req, res) => {
   attendance.durationMins = durationMins;
   attendance.status = 'CHECKED_OUT';
   await attendance.save();
+
+  console.log('Updated attendance:', attendance);
 
   // Audit log
   await AuditLog.create({
