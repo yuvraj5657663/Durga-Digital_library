@@ -25,10 +25,14 @@ const AdminLayout = () => {
   const [notificationOpen, setNotificationOpen] = useState(false);
 
   // Fetch notifications
-  const { data: notifData } = useQuery({
+  const { data: notifData, error: notifError } = useQuery({
     queryKey: ['admin', 'notifications'],
     queryFn: () => notificationService.getNotifications({ limit: 10 }),
     refetchInterval: 60000, // Refetch every minute
+    onError: (error) => {
+      console.error('Notification fetch error:', error);
+      // Don't show toast for notification errors to avoid annoying user
+    }
   });
 
   const markAllAsReadMutation = useMutation({
@@ -38,6 +42,19 @@ const AdminLayout = () => {
       toast.success('All notifications marked as read');
     },
     onError: () => toast.error('Failed to mark notifications as read'),
+  });
+
+  const createTestNotificationMutation = useMutation({
+    mutationFn: () => notificationService.createTestNotification({
+      title: '🔔 Test Notification',
+      body: 'This is a test notification to verify the notification system is working correctly.',
+      type: 'custom'
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'notifications'] });
+      toast.success('Test notification created');
+    },
+    onError: () => toast.error('Failed to create test notification'),
   });
 
   const notifications = notifData?.notifications || [];
@@ -189,25 +206,46 @@ const AdminLayout = () => {
                 <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
                   <div className="p-3 border-b border-gray-200 flex items-center justify-between">
                     <h3 className="text-sm font-semibold text-gray-900">Notifications</h3>
-                    {unreadCount > 0 && (
+                    <div className="flex gap-2">
                       <button
-                        onClick={() => markAllAsReadMutation.mutate()}
-                        className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          createTestNotificationMutation.mutate();
+                        }}
+                        disabled={createTestNotificationMutation.isPending}
+                        className="text-xs text-purple-600 hover:text-purple-800 font-medium disabled:opacity-50"
+                        title="Create test notification"
                       >
-                        Mark all as read
+                        + Test
                       </button>
-                    )}
+                      {unreadCount > 0 && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            markAllAsReadMutation.mutate();
+                          }}
+                          disabled={markAllAsReadMutation.isPending}
+                          className="text-xs text-blue-600 hover:text-blue-800 font-medium disabled:opacity-50"
+                        >
+                          {markAllAsReadMutation.isPending ? 'Marking...' : 'Mark all as read'}
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div className="max-h-96 overflow-y-auto">
-                    {notifications.length === 0 ? (
+                    {notifError ? (
+                      <div className="p-4 text-center text-red-500 text-sm">
+                        Failed to load notifications
+                      </div>
+                    ) : notifications.length === 0 ? (
                       <div className="p-4 text-center text-gray-500 text-sm">
                         No notifications
                       </div>
                     ) : (
                       notifications.map((notif) => (
                         <div
-                          key={notif.id}
-                          className={`p-3 border-b border-gray-100 hover:bg-gray-50 ${
+                          key={notif.id || notif._id}
+                          className={`p-3 border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${
                             !notif.isRead ? 'bg-blue-50/50' : ''
                           }`}
                         >
@@ -223,7 +261,7 @@ const AdminLayout = () => {
                                 {notif.body}
                               </p>
                               <p className="text-xs text-gray-400 mt-1">
-                                {new Date(notif.createdAt).toLocaleString()}
+                                {notif.createdAt ? new Date(notif.createdAt).toLocaleString() : 'Just now'}
                               </p>
                             </div>
                           </div>

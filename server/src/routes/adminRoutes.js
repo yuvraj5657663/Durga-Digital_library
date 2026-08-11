@@ -9,8 +9,8 @@ import * as announcementController from '../controllers/announcementController.j
 import * as admissionController  from '../controllers/admissionRequestController.js';
 import * as renewalController   from '../controllers/renewalController.js';
 import * as notificationController from '../controllers/notificationController.js';
-import Seat from '../models/Seat.js';
 import { SHIFT_CONFIG } from '../config/shiftConfig.js';
+import Seat from '../models/Seat.js';
 
 const router = express.Router();
 
@@ -130,8 +130,9 @@ router.post('/admissions/:id/approve', admissionController.approveAdmissionReque
 router.post('/admissions/:id/reject',  admissionController.rejectAdmissionRequestController);
 
 // ── Notifications ───────────────────────────────────────────────────────────────
-router.get('/notifications',           notificationController.getNotificationsController);
-router.patch('/notifications/read-all', notificationController.markAllAsReadController);
-router.patch('/notifications/:id/read', notificationController.markAsReadController);
+router.get('/notifications',              notificationController.getNotificationsController);
+router.post('/notifications/test',        notificationController.createTestNotificationController);
+router.patch('/notifications/read-all',  notificationController.markAllAsReadController);
+router.patch('/notifications/:id/read',  notificationController.markAsReadController);
 
 export default router;
