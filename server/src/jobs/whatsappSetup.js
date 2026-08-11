@@ -23,8 +23,17 @@
  *                             when running --single-process on Linux.
  */
 
-import { Client, LocalAuth } from 'whatsapp-web.js';  // LocalAuth must be imported as a CLASS
-import qrcode from 'qrcode-terminal';
+// whatsapp-web.js ships as a CommonJS module.
+// In an ES Module project ("type":"module") you CANNOT use named imports from CJS packages:
+//   ❌  import { Client, LocalAuth } from 'whatsapp-web.js';  → SyntaxError at runtime
+// The correct pattern is default import + destructuring:
+//   ✅  import pkg from 'whatsapp-web.js'; const { Client, LocalAuth } = pkg;
+import pkg from 'whatsapp-web.js';
+const { Client, LocalAuth } = pkg;
+
+// qrcode-terminal is also CJS — same pattern applies
+import qrcodeTerminal from 'qrcode-terminal';
+const qrcode = qrcodeTerminal;
 import config from '../config/index.js';
 import logger from '../config/logger.js';
 
