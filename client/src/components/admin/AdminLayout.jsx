@@ -1,11 +1,13 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, Routes, Route } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
 import {
   LayoutDashboard, Users, Calendar, Megaphone,
-  FileText, LogOut, Menu, X, Bell
+  FileText, LogOut, Menu, X, Bell, Check
 } from 'lucide-react';
-import { useState } from 'react';
+import { notificationService } from '../../services/notificationService';
 
 // Real page components
 import AdminDashboard    from '../../pages/admin/AdminDashboard';
@@ -18,12 +20,44 @@ const AdminLayout = () => {
   const { logout, user } = useAuth();
   const navigate  = useNavigate();
   const location  = useLocation();
+  const qc = useQueryClient();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [notificationOpen, setNotificationOpen] = useState(false);
+
+  // Fetch notifications
+  const { data: notifData } = useQuery({
+    queryKey: ['admin', 'notifications'],
+    queryFn: () => notificationService.getNotifications({ limit: 10 }),
+    refetchInterval: 60000, // Refetch every minute
+  });
+
+  const markAllAsReadMutation = useMutation({
+    mutationFn: () => notificationService.markAllAsRead(),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'notifications'] });
+      toast.success('All notifications marked as read');
+    },
+    onError: () => toast.error('Failed to mark notifications as read'),
+  });
+
+  const notifications = notifData?.notifications || [];
+  const unreadCount = notifData?.unreadCount || 0;
 
   // Close sidebar on route change (mobile)
   useEffect(() => {
     setSidebarOpen(false);
   }, [location.pathname]);
+
+  // Close notification dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (notificationOpen && !event.target.closest('.notification-dropdown')) {
+        setNotificationOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [notificationOpen]);
 
   const handleLogout = async () => {
     try { await logout(); } catch {}
@@ -137,12 +171,69 @@ const AdminLayout = () => {
           </div>
 
           <div className="flex items-center gap-4">
-            <button className="relative text-gray-500 hover:text-gray-900 p-1" aria-label="Notifications">
-              <Bell className="w-5 h-5" />
-              <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-                3
-              </span>
-            </button>
+            <div className="notification-dropdown relative">
+              <button
+                onClick={() => setNotificationOpen(!notificationOpen)}
+                className="relative text-gray-500 hover:text-gray-900 p-1"
+                aria-label="Notifications"
+              >
+                <Bell className="w-5 h-5" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {notificationOpen && (
+                <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                  <div className="p-3 border-b border-gray-200 flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-gray-900">Notifications</h3>
+                    {unreadCount > 0 && (
+                      <button
+                        onClick={() => markAllAsReadMutation.mutate()}
+                        className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                      >
+                        Mark all as read
+                      </button>
+                    )}
+                  </div>
+                  <div className="max-h-96 overflow-y-auto">
+                    {notifications.length === 0 ? (
+                      <div className="p-4 text-center text-gray-500 text-sm">
+                        No notifications
+                      </div>
+                    ) : (
+                      notifications.map((notif) => (
+                        <div
+                          key={notif.id}
+                          className={`p-3 border-b border-gray-100 hover:bg-gray-50 ${
+                            !notif.isRead ? 'bg-blue-50/50' : ''
+                          }`}
+                        >
+                          <div className="flex items-start gap-2">
+                            {!notif.isRead && (
+                              <div className="w-2 h-2 rounded-full bg-blue-500 mt-1.5 flex-shrink-0" />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-900 truncate">
+                                {notif.title}
+                              </p>
+                              <p className="text-xs text-gray-600 mt-0.5 line-clamp-2">
+                                {notif.body}
+                              </p>
+                              <p className="text-xs text-gray-400 mt-1">
+                                {new Date(notif.createdAt).toLocaleString()}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
             <span className="text-sm text-gray-600 hidden sm:block">
               Welcome, <span className="font-semibold text-gray-900">{user?.username || 'Admin'}</span>
             </span>

@@ -8,7 +8,9 @@ import * as attendanceController from '../controllers/attendanceController.js';
 import * as announcementController from '../controllers/announcementController.js';
 import * as admissionController  from '../controllers/admissionRequestController.js';
 import * as renewalController   from '../controllers/renewalController.js';
+import * as notificationController from '../controllers/notificationController.js';
 import Seat from '../models/Seat.js';
+import { SHIFT_CONFIG } from '../config/shiftConfig.js';
 
 const router = express.Router();
 
@@ -69,6 +71,24 @@ router.get('/seats', async (req, res) => {
   }
 });
 
+// ── Shift Configuration ───────────────────────────────────────────────────────
+// Returns available shift configurations for dynamic filtering
+router.get('/shifts', (req, res) => {
+  try {
+    const shifts = Object.entries(SHIFT_CONFIG).map(([key, config]) => ({
+      key,
+      name: config.name,
+      startTime: config.startTime,
+      endTime: config.endTime,
+      description: config.description
+    }));
+
+    return res.json({ success: true, data: shifts });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // ── Students ──────────────────────────────────────────────────────────────────
 router.post('/students',     studentController.createStudentController);
 router.get('/students',      studentController.listStudentsController);
@@ -90,12 +110,13 @@ router.post('/renewal/:requestId/reject',        renewalController.rejectRenewal
 router.delete('/renewal/:requestId',              renewalController.deleteRenewalRequestController);
 
 // ── Attendance ────────────────────────────────────────────────────────────────
-router.get('/attendance',         attendanceController.listAttendanceController);
-router.get('/attendance/stats',   attendanceController.getAttendanceStatsController);
-router.post('/attendance',        attendanceController.markAttendanceController);
-router.post('/attendance/scan',   attendanceController.scanQrAttendanceController);
-router.get('/attendance/scan',    attendanceController.scanQrAttendanceController);
-router.delete('/attendance/:id',  attendanceController.deleteAttendanceController);
+router.get('/attendance',           attendanceController.listAttendanceController);
+router.get('/attendance/stats',     attendanceController.getAttendanceStatsController);
+router.post('/attendance',          attendanceController.markAttendanceController);
+router.post('/attendance/checkout',  attendanceController.checkoutAttendanceController);
+router.post('/attendance/scan',     attendanceController.scanQrAttendanceController);
+router.get('/attendance/scan',      attendanceController.scanQrAttendanceController);
+router.delete('/attendance/:id',    attendanceController.deleteAttendanceController);
 
 // ── Announcements ─────────────────────────────────────────────────────────────
 router.get('/announcements',         announcementController.listAnnouncementsController);
@@ -107,5 +128,10 @@ router.delete('/announcements/:id',  announcementController.deleteAnnouncementCo
 router.get('/admissions',              admissionController.getAdmissionRequestsController);
 router.post('/admissions/:id/approve', admissionController.approveAdmissionRequestController);
 router.post('/admissions/:id/reject',  admissionController.rejectAdmissionRequestController);
+
+// ── Notifications ───────────────────────────────────────────────────────────────
+router.get('/notifications',           notificationController.getNotificationsController);
+router.patch('/notifications/read-all', notificationController.markAllAsReadController);
+router.patch('/notifications/:id/read', notificationController.markAsReadController);
 
 export default router;

@@ -14,6 +14,7 @@ const attendanceSchema = new mongoose.Schema(
     shift: { type: String, trim: true, default: '' },
     seatCode: { type: String, trim: true, default: '' },
     shiftType: { type: String, trim: true, default: '' }, // NEW: For shift-based validation
+    status: { type: String, enum: ['CHECKED_IN', 'CHECKED_OUT', 'ABSENT'], default: 'ABSENT' }, // NEW: Explicit status field
     markedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     notes: { type: String, trim: true, default: '' },
     branch: { type: String, trim: true, default: '' },

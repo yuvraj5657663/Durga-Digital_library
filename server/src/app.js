@@ -16,10 +16,6 @@ import studentPortalRoutes from './routes/studentPortalRoutes.js';
 import admissionRoutes from './routes/admissionRoutes.js';
 import inquiryRoutes from './routes/inquiryRoutes.js';
 
-// Jobs
-import { startCronJobs } from './jobs/cronJobs.js';
-import { setupWhatsApp } from './jobs/whatsappSetup.js';
-
 const app = express();
 
 // Security middleware

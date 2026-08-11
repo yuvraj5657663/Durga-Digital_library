@@ -11,6 +11,11 @@ export const attendanceService = {
     return response.data.data;
   },
 
+  checkoutAttendance: async (data) => {
+    const response = await api.post('/admin/attendance/checkout', data);
+    return response.data.data;
+  },
+
   scanQrAttendance: async (data) => {
     const response = await api.post('/admin/attendance/scan', data);
     return response.data.data;

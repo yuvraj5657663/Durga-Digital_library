@@ -41,10 +41,9 @@ export const config = {
   },
   
   whatsapp: {
-    disabled: process.env.WHATSAPP_ENABLED === 'false' || 
-              process.env.WHATSAPP_ENABLED === false ||
-              process.env.DISABLE_WHATSAPP === 'true' ||
-              !process.env.WHATSAPP_ENABLED,
+    // Explicitly opt-in: WHATSAPP_ENABLED=true enables WhatsApp.
+    // Everything else (unset, 'false', '0') keeps it disabled.
+    disabled: process.env.WHATSAPP_ENABLED !== 'true',
   },
   
   cors: {

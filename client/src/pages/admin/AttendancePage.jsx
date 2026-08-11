@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { Search, CheckCircle, XCircle, Clock, RefreshCw, ChevronLeft, ChevronRight, Users } from 'lucide-react';
+import { Search, CheckCircle, XCircle, Clock, RefreshCw, ChevronLeft, ChevronRight, Users, LogOut } from 'lucide-react';
 import { attendanceService } from '../../services/attendanceService';
 import { studentService } from '../../services/studentService';
+import { shiftService } from '../../services/shiftService';
 
 const today = new Date().toISOString().slice(0, 10);
-const SHIFTS = ['', 'Shift 1', 'Shift 2', 'Shift 3', 'Shift 4'];
 const LIMIT = 50;
 
 export default function AttendancePage() {
@@ -15,6 +15,14 @@ export default function AttendancePage() {
   const [shift, setShift] = useState('');
   const [search,setSearch]= useState('');
   const [page,  setPage]  = useState(1);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Fetch dynamic shifts
+  const { data: shiftsData } = useQuery({
+    queryKey: ['admin', 'shifts'],
+    queryFn: () => shiftService.getShifts(),
+    staleTime: 10 * 60_000,
+  });
 
   // Fetch ALL active students for the roster
   const { data: studentData, isLoading: studentsLoading } = useQuery({
@@ -24,13 +32,13 @@ export default function AttendancePage() {
   });
 
   // Fetch today's attendance
-  const { data: attendanceData, isLoading: attLoading } = useQuery({
+  const { data: attendanceData, isLoading: attLoading, refetch: refetchAttendance } = useQuery({
     queryKey: ['admin', 'attendance', date, shift],
     queryFn:  () => attendanceService.getAttendance({ date, shift, limit: 200 }),
   });
 
   // Stats
-  const { data: stats } = useQuery({
+  const { data: stats, refetch: refetchStats } = useQuery({
     queryKey: ['admin', 'attendance', 'stats', date],
     queryFn:  () => attendanceService.getAttendanceStats({ date }),
   });
@@ -44,8 +52,19 @@ export default function AttendancePage() {
     onError: (e) => toast.error(e.response?.data?.message || 'Failed to mark attendance'),
   });
 
+  const checkoutMutation = useMutation({
+    mutationFn: (payload) => attendanceService.checkoutAttendance(payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'attendance'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'stats'] });
+      toast.success('Student checked out successfully');
+    },
+    onError: (e) => toast.error(e.response?.data?.message || 'Failed to check out student'),
+  });
+
   const students = studentData?.data || [];
   const attendance = attendanceData?.data || [];
+  const shifts = shiftsData || [];
 
   // Build a map: studentId → attendance record
   const attMap = {};
@@ -53,6 +72,18 @@ export default function AttendancePage() {
     const sid = a.student?._id || a.student;
     if (sid) attMap[String(sid)] = a;
   });
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await Promise.all([refetchAttendance(), refetchStats()]);
+      toast.success('Attendance data refreshed');
+    } catch (error) {
+      toast.error('Failed to refresh attendance data');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const filtered = students.filter(s => {
     if (!search) return true;
@@ -71,6 +102,13 @@ export default function AttendancePage() {
       date,
       checkIn: new Date().toTimeString().slice(0, 5),
       method: 'manual',
+    });
+  };
+
+  const handleCheckout = (attendance) => {
+    if (!window.confirm(`Check out ${attendance.student?.name || 'student'}?`)) return;
+    checkoutMutation.mutate({
+      attendanceId: attendance.id || attendance._id,
     });
   };
 
@@ -95,9 +133,12 @@ export default function AttendancePage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Attendance</h1>
-        <button onClick={() => qc.invalidateQueries({ queryKey: ['admin', 'attendance'] })}
-          className="btn btn-secondary flex items-center gap-2">
-          <RefreshCw className="w-4 h-4" /> Refresh
+        <button 
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          className="btn btn-secondary flex items-center gap-2 disabled:opacity-50">
+          <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} /> 
+          {isRefreshing ? 'Refreshing...' : 'Refresh'}
         </button>
       </div>
 
@@ -121,9 +162,14 @@ export default function AttendancePage() {
       <div className="card !p-4 flex flex-wrap gap-3 items-center">
         <input type="date" value={date} onChange={e => { setDate(e.target.value); setPage(1); }}
           className="input w-40 text-sm" />
-        <select className="input w-36 text-sm" value={shift}
+        <select className="input w-48 text-sm" value={shift}
           onChange={e => { setShift(e.target.value); setPage(1); }}>
-          {SHIFTS.map(s => <option key={s} value={s}>{s || 'All Shifts'}</option>)}
+          <option value="">All Shifts</option>
+          {shifts.map(s => (
+            <option key={s.key} value={s.key}>
+              {s.name} ({s.startTime} - {s.endTime})
+            </option>
+          ))}
         </select>
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -142,7 +188,7 @@ export default function AttendancePage() {
           <table className="min-w-full text-sm">
             <thead className="bg-gray-50 border-b">
               <tr>
-                {['Seat','Name','Shift','Mobile','Check In','Status','Action'].map(h => (
+                {['Seat','Name','Shift','Mobile','Check In','Check Out','Status','Action'].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">{h}</th>
                 ))}
               </tr>
@@ -151,7 +197,7 @@ export default function AttendancePage() {
               {(studentsLoading || attLoading)
                 ? Array.from({ length: 8 }).map((_, i) => (
                     <tr key={i}>
-                      {Array.from({ length: 7 }).map((_, j) => (
+                      {Array.from({ length: 8 }).map((_, j) => (
                         <td key={j} className="px-4 py-3">
                           <div className="animate-pulse bg-gray-200 h-4 rounded w-20" />
                         </td>
@@ -159,11 +205,13 @@ export default function AttendancePage() {
                     </tr>
                   ))
                 : paged.length === 0
-                  ? <tr><td colSpan={7} className="px-4 py-10 text-center text-gray-400">No students found</td></tr>
+                  ? <tr><td colSpan={8} className="px-4 py-10 text-center text-gray-400">No students found</td></tr>
                   : paged.map(s => {
                       const sid  = s._id || s.id;
                       const rec  = attMap[String(sid)];
                       const isPresent = !!rec?.checkIn;
+                      const isCheckedIn = rec?.status === 'CHECKED_IN';
+                      const isCheckedOut = rec?.status === 'CHECKED_OUT';
                       return (
                         <tr key={sid} className={`hover:bg-gray-50 ${isPresent ? 'bg-green-50/30' : ''}`}>
                           <td className="px-4 py-3 font-mono text-xs text-gray-500">{s.seatCode || '—'}</td>
@@ -171,10 +219,15 @@ export default function AttendancePage() {
                           <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{s.shift || '—'}</td>
                           <td className="px-4 py-3 text-gray-500">{s.mobile}</td>
                           <td className="px-4 py-3 text-gray-600">{rec?.checkIn || '—'}</td>
+                          <td className="px-4 py-3 text-gray-600">{rec?.checkOut || '—:—'}</td>
                           <td className="px-4 py-3">
-                            {isPresent
+                            {isCheckedIn
+                              ? <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
+                                  <Clock className="w-3 h-3" /> Checked In
+                                </span>
+                              : isCheckedOut
                               ? <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
-                                  <CheckCircle className="w-3 h-3" /> Present
+                                  <CheckCircle className="w-3 h-3" /> Checked Out
                                 </span>
                               : <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
                                   <XCircle className="w-3 h-3" /> Absent
@@ -187,6 +240,14 @@ export default function AttendancePage() {
                                 disabled={markMutation.isPending}
                                 className="btn btn-primary !py-1 !px-3 text-xs flex items-center gap-1">
                                 <CheckCircle className="w-3.5 h-3.5" /> Mark Present
+                              </button>
+                            )}
+                            {isCheckedIn && (
+                              <button
+                                onClick={() => handleCheckout(rec)}
+                                disabled={checkoutMutation.isPending}
+                                className="btn btn-secondary !py-1 !px-3 text-xs flex items-center gap-1">
+                                <LogOut className="w-3.5 h-3.5" /> Check Out
                               </button>
                             )}
                           </td>
