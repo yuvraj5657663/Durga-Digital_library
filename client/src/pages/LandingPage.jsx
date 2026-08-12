@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
-import { BookOpen, Clock, Wifi, Shield, Users, Zap, Phone, MapPin, X, ArrowRight, Sparkles, Cpu, Armchair, Lock, BatteryCharging, Monitor, ChevronRight, Star } from 'lucide-react';
+import { BookOpen, Clock, Wifi, Shield, Users, Zap, Phone, MapPin, X, ArrowRight, Sparkles, Cpu, Armchair, Lock, BatteryCharging, Monitor, ChevronRight, Star, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const LandingPage = () => {
