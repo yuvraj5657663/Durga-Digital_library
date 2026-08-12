@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
 import { BookOpen, Clock, Wifi, Shield, Users, Zap, Phone, MapPin, X, ArrowRight, Sparkles, Cpu, Armchair, Lock, BatteryCharging, Monitor, ChevronRight, Star, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { admissionInquiryService } from '../services/admissionInquiryService';
 
 const LandingPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -170,17 +171,42 @@ const LandingPage = () => {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch('/api/v1/admission/inquiry', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      });
+      // Validate required fields
+      if (!formData.name.trim()) {
+        toast.error('Student Full Name is required');
+        setIsSubmitting(false);
+        return;
+      }
+      if (!formData.phone.trim()) {
+        toast.error('Mobile Number is required');
+        setIsSubmitting(false);
+        return;
+      }
+      if (!formData.whatsapp.trim()) {
+        toast.error('WhatsApp Number is required');
+        setIsSubmitting(false);
+        return;
+      }
+      if (!formData.address.trim()) {
+        toast.error('Address/Village is required');
+        setIsSubmitting(false);
+        return;
+      }
+      if (!formData.shift) {
+        toast.error('Preferred Shift is required');
+        setIsSubmitting(false);
+        return;
+      }
+      if (!formData.joiningDate) {
+        toast.error('Joining Date is required');
+        setIsSubmitting(false);
+        return;
+      }
 
-      const data = await response.json();
+      // Use admissionInquiryService for API call
+      const response = await admissionInquiryService.create(formData);
 
-      if (response.ok) {
+      if (response.success || response.data) {
         toast.success('Application submitted successfully! We will contact you soon.');
         setIsModalOpen(false);
         setFormData({
@@ -192,10 +218,11 @@ const LandingPage = () => {
           joiningDate: ''
         });
       } else {
-        toast.error(data.message || 'Failed to submit application');
+        toast.error(response.message || 'Failed to submit application');
       }
     } catch (error) {
-      toast.error('Network error. Please try again.');
+      const errorMessage = error.response?.data?.message || error.message || 'Network error. Please try again.';
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }

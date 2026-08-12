@@ -38,7 +38,9 @@ export const createAdmissionInquiryController = asyncHandler(async (req, res) =>
   if (!shift) {
     throw new ValidationError('Preferred Shift is required');
   }
-  if (!['Morning', 'Afternoon', 'Evening', 'Full Day'].includes(shift)) {
+  // Accept both old and new shift values
+  const validShifts = ['Morning', 'Afternoon', 'Evening', 'Full Day', 'Special 6-Hour'];
+  if (!validShifts.includes(shift)) {
     throw new ValidationError('Invalid shift option');
   }
   if (!joiningDate) {

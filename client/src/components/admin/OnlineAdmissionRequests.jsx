@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { Phone, MessageCircle, Check, X, Trash2, Calendar, MapPin, Clock, BadgeCheck } from 'lucide-react';
+import { Phone, MessageCircle, Check, X, Trash2, Calendar, MapPin, Clock, BadgeCheck, RefreshCw } from 'lucide-react';
 import { admissionInquiryService } from '../../services/admissionInquiryService';
 
 const statusColors = {
@@ -21,7 +21,7 @@ export default function OnlineAdmissionRequests() {
   const [filter, setFilter] = useState('all');
   const queryClient = useQueryClient();
 
-  const { data: inquiriesData, isLoading } = useQuery({
+  const { data: inquiriesData, isLoading, refetch } = useQuery({
     queryKey: ['admission-inquiries', filter],
     queryFn: () => admissionInquiryService.getAll(filter !== 'all' ? { status: filter } : {}),
     refetchInterval: 30000, // Refresh every 30 seconds
@@ -38,6 +38,7 @@ export default function OnlineAdmissionRequests() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admission-inquiries'] });
       queryClient.invalidateQueries({ queryKey: ['admission-inquiries-pending-count'] });
+      refetch(); // Force immediate refresh
       toast.success('Status updated successfully');
     },
     onError: (error) => {
@@ -50,6 +51,7 @@ export default function OnlineAdmissionRequests() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admission-inquiries'] });
       queryClient.invalidateQueries({ queryKey: ['admission-inquiries-pending-count'] });
+      refetch(); // Force immediate refresh
       toast.success('Inquiry deleted successfully');
     },
     onError: (error) => {
@@ -113,12 +115,21 @@ export default function OnlineAdmissionRequests() {
             Manage and respond to online admission applications
           </p>
         </div>
-        {pendingCount > 0 && (
-          <div className="bg-orange-100 text-orange-800 px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2">
-            <BadgeCheck className="w-4 h-4" />
-            {pendingCount} New Admission Inquiries
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          {pendingCount > 0 && (
+            <div className="bg-orange-100 text-orange-800 px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2">
+              <BadgeCheck className="w-4 h-4" />
+              {pendingCount} New Admission Inquiries
+            </div>
+          )}
+          <button
+            onClick={() => refetch()}
+            className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+            title="Refresh"
+          >
+            <RefreshCw className="w-5 h-5" />
+          </button>
+        </div>
       </div>
 
       {/* Filter Tabs */}

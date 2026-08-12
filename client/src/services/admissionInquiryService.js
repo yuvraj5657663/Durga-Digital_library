@@ -25,5 +25,10 @@ export const admissionInquiryService = {
   create: async (data) => {
     const response = await axios.post(`${API_BASE}/admission/inquiry`, data);
     return response.data;
+  },
+
+  createInquiry: async (data) => {
+    const response = await axios.post(`${API_BASE}/admission/inquiry`, data);
+    return response.data;
   }
 };
