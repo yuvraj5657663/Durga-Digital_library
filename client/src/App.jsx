@@ -9,16 +9,14 @@ import StudentLayout from './components/student/StudentLayout';
 function AppRoutes() {
   const { isAuthenticated, loading, isAdmin } = useAuth();
 
+  // Landing page दिखाएं जब loading हो या जब user authenticated न हो
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-library-blue"></div>
-      </div>
-    );
+    return <LandingPage />;
   }
 
   return (
     <Routes>
+      {/* Landing page - public route */}
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       
@@ -49,12 +47,12 @@ function AppRoutes() {
           isAuthenticated ? (
             <Navigate to={isAdmin ? '/admin' : '/student'} replace />
           ) : (
-            <Navigate to="/login" replace />
+            <Navigate to="/" replace />
           )
         }
       />
       
-      {/* Catch all */}
+      {/* Catch all - redirect to landing page */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
