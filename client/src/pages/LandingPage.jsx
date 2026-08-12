@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
 import { BookOpen, Clock, Wifi, Shield, Users, Zap, Phone, MapPin, X, ArrowRight, Sparkles, Cpu, Armchair, Lock, BatteryCharging, Monitor, ChevronRight, Star, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -18,6 +18,7 @@ const LandingPage = () => {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const containerRef = useRef(null);
+  const navigate = useNavigate();
 
   const { scrollY } = useScroll();
   const navbarOpacity = useTransform(scrollY, [0, 100], [0.8, 0.95]);
@@ -282,12 +283,14 @@ const LandingPage = () => {
               animate={{ opacity: 1, x: 0 }}
               className="flex items-center space-x-4"
             >
-              <Link 
-                to="/login" 
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => navigate('/login')}
                 className="px-5 py-2.5 text-slate-300 hover:text-white font-medium transition-all hover:bg-white/5 rounded-lg"
               >
                 Login
-              </Link>
+              </motion.button>
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -353,6 +356,46 @@ const LandingPage = () => {
                   <span>{highlight.text}</span>
                 </motion.div>
               ))}
+            </motion.div>
+
+            {/* Secondary Navigation */}
+            <motion.div
+              variants={itemVariants}
+              className="flex flex-wrap justify-center gap-4 mb-8"
+            >
+              <button
+                onClick={() => {
+                  const facilitiesSection = document.getElementById('facilities');
+                  if (facilitiesSection) {
+                    facilitiesSection.scrollIntoView({ behavior: 'smooth' });
+                  }
+                }}
+                className="px-4 py-2 bg-white/10 backdrop-blur-md rounded-full border border-white/20 text-sm font-medium hover:bg-white/20 transition-all"
+              >
+                Facilities
+              </button>
+              <button
+                onClick={() => {
+                  const pricingSection = document.getElementById('pricing');
+                  if (pricingSection) {
+                    pricingSection.scrollIntoView({ behavior: 'smooth' });
+                  }
+                }}
+                className="px-4 py-2 bg-white/10 backdrop-blur-md rounded-full border border-white/20 text-sm font-medium hover:bg-white/20 transition-all"
+              >
+                Fee Structure
+              </button>
+              <button
+                onClick={() => {
+                  const contactSection = document.getElementById('contact');
+                  if (contactSection) {
+                    contactSection.scrollIntoView({ behavior: 'smooth' });
+                  }
+                }}
+                className="px-4 py-2 bg-white/10 backdrop-blur-md rounded-full border border-white/20 text-sm font-medium hover:bg-white/20 transition-all"
+              >
+                Contact
+              </button>
             </motion.div>
 
             <motion.h1
@@ -436,7 +479,7 @@ const LandingPage = () => {
       </section>
 
       {/* Features Section */}
-      <section className="py-24 relative bg-slate-900">
+      <section id="facilities" className="py-24 relative bg-slate-900">
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-slate-900 to-slate-950" />
         </div>
@@ -490,7 +533,7 @@ const LandingPage = () => {
       </section>
 
       {/* Timing & Fee Structure */}
-      <section className="py-24 relative bg-slate-950">
+      <section id="pricing" className="py-24 relative bg-slate-950">
         <div className="relative z-10 container mx-auto px-6">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -608,7 +651,7 @@ const LandingPage = () => {
       </section>
 
       {/* Footer */}
-      <footer className="bg-slate-950 border-t border-white/10">
+      <footer id="contact" className="bg-slate-950 border-t border-white/10">
         <div className="container mx-auto px-6 py-16">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
             <div>
@@ -653,16 +696,43 @@ const LandingPage = () => {
             <div>
               <h3 className="text-lg font-bold mb-6 text-white">Quick Links</h3>
               <div className="space-y-3">
-                <Link to="/login" className="flex items-center space-x-2 text-slate-300 hover:text-white transition-colors group">
+                <button 
+                  onClick={() => navigate('/login')}
+                  className="flex items-center space-x-2 text-slate-300 hover:text-white transition-colors group w-full text-left"
+                >
                   <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                   <span>Login</span>
-                </Link>
+                </button>
                 <button 
                   onClick={() => setIsModalOpen(true)}
                   className="flex items-center space-x-2 text-slate-300 hover:text-white transition-colors group w-full text-left"
                 >
                   <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                   <span>Apply Online</span>
+                </button>
+                <button 
+                  onClick={() => {
+                    const facilitiesSection = document.getElementById('facilities');
+                    if (facilitiesSection) {
+                      facilitiesSection.scrollIntoView({ behavior: 'smooth' });
+                    }
+                  }}
+                  className="flex items-center space-x-2 text-slate-300 hover:text-white transition-colors group w-full text-left"
+                >
+                  <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  <span>Facilities</span>
+                </button>
+                <button 
+                  onClick={() => {
+                    const pricingSection = document.getElementById('pricing');
+                    if (pricingSection) {
+                      pricingSection.scrollIntoView({ behavior: 'smooth' });
+                    }
+                  }}
+                  className="flex items-center space-x-2 text-slate-300 hover:text-white transition-colors group w-full text-left"
+                >
+                  <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  <span>Fee Structure</span>
                 </button>
                 <a 
                   href="https://wa.me/917542893960"
