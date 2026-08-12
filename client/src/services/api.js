@@ -30,6 +30,7 @@ api.interceptors.request.use(
   (config) => {
     // getAccessToken() reads from the role-scoped key for this tab's session
     const token = getAccessToken();
+    console.log('API Request:', config.method?.toUpperCase(), config.url, 'Token:', token ? 'Present' : 'Missing');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -63,6 +64,7 @@ function forceLogout() {
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
+    console.error('API Error:', error.config?.url, error.response?.status, error.response?.data);
     const originalRequest = error.config;
 
     // Only handle 401 and only once per request

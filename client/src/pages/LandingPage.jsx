@@ -202,6 +202,8 @@ const LandingPage = () => {
         return;
       }
 
+      console.log('Submitting admission form:', formData);
+
       // Use direct fetch for debugging
       const response = await fetch('/api/v1/admission/inquiry', {
         method: 'POST',
@@ -212,6 +214,7 @@ const LandingPage = () => {
       });
 
       const data = await response.json();
+      console.log('Admission form response:', data);
 
       if (response.ok) {
         toast.success('Application submitted successfully! We will contact you soon.');
