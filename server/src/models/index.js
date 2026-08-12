@@ -10,6 +10,7 @@ import Seat from './Seat.js';
 import Branch from './Branch.js';
 import Inquiry from './Inquiry.js';
 import AdmissionRequest from './AdmissionRequest.js';
+import AdmissionInquiry from './AdmissionInquiry.js';
 
 export {
   User,
@@ -23,5 +24,6 @@ export {
   Seat,
   Branch,
   Inquiry,
-  AdmissionRequest
+  AdmissionRequest,
+  AdmissionInquiry
 };

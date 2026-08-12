@@ -5,9 +5,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
   LayoutDashboard, Users, Calendar, Megaphone,
-  FileText, LogOut, Menu, X, Bell, Check
+  FileText, LogOut, Menu, X, Bell, Check, UserPlus
 } from 'lucide-react';
 import { notificationService } from '../../services/notificationService';
+import axios from 'axios';
 
 // Real page components
 import AdminDashboard    from '../../pages/admin/AdminDashboard';
@@ -15,6 +16,7 @@ import StudentsPage      from '../../pages/admin/StudentsPage';
 import AttendancePage    from '../../pages/admin/AttendancePage';
 import AnnouncementsPage from '../../pages/admin/AnnouncementsPage';
 import AdmissionsPage    from '../../pages/admin/AdmissionsPage';
+import OnlineAdmissionRequests from './OnlineAdmissionRequests';
 
 const AdminLayout = () => {
   const { logout, user } = useAuth();
@@ -23,6 +25,20 @@ const AdminLayout = () => {
   const qc = useQueryClient();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
+
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
+
+  // Fetch pending admission inquiries count
+  const { data: pendingAdmissionsData } = useQuery({
+    queryKey: ['admission-inquiries-pending-count'],
+    queryFn: async () => {
+      const response = await axios.get(`${API_BASE}/admission/admissions/pending-count`);
+      return response.data;
+    },
+    refetchInterval: 30000,
+  });
+
+  const pendingAdmissionsCount = pendingAdmissionsData?.data?.count || 0;
 
   // Fetch notifications
   const { data: notifData, error: notifError } = useQuery({
@@ -86,6 +102,7 @@ const AdminLayout = () => {
     { name: 'Students',    href: '/admin/students',      icon: Users           },
     { name: 'Attendance',  href: '/admin/attendance',    icon: Calendar        },
     { name: 'Admissions',  href: '/admin/admissions',    icon: FileText        },
+    { name: 'Online Admission', href: '/admin/online-admissions', icon: UserPlus, badge: pendingAdmissionsCount },
     { name: 'Announcements', href: '/admin/announcements', icon: Megaphone     },
   ];
 
@@ -143,7 +160,12 @@ const AdminLayout = () => {
               `}
             >
               <item.icon className="w-5 h-5 mr-3 flex-shrink-0" />
-              {item.name}
+              <span className="flex-1">{item.name}</span>
+              {item.badge > 0 && (
+                <span className="bg-orange-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                  {item.badge > 9 ? '9+' : item.badge}
+                </span>
+              )}
             </Link>
           ))}
         </nav>
@@ -292,6 +314,7 @@ const AdminLayout = () => {
             <Route path="students"        element={<StudentsPage />} />
             <Route path="attendance"      element={<AttendancePage />} />
             <Route path="admissions"      element={<AdmissionsPage />} />
+            <Route path="online-admissions" element={<OnlineAdmissionRequests />} />
             <Route path="announcements"   element={<AnnouncementsPage />} />
           </Routes>
         </main>

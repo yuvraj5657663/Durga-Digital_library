@@ -41,9 +41,9 @@ export const config = {
   },
   
   whatsapp: {
-    // Explicitly opt-in: WHATSAPP_ENABLED=true enables WhatsApp.
-    // Everything else (unset, 'false', '0') keeps it disabled.
-    disabled: process.env.WHATSAPP_ENABLED !== 'true',
+    // WhatsApp is disabled by default
+    // Enable by setting WHATSAPP_ENABLED=true (and ensure DISABLE_WHATSAPP is not set to true)
+    disabled: !(process.env.WHATSAPP_ENABLED === 'true' && process.env.DISABLE_WHATSAPP !== 'true'),
   },
   
   cors: {

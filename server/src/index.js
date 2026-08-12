@@ -38,88 +38,102 @@ process.on('uncaughtException', (error) => {
   process.exit(1);
 });
 
-async function startServer() {
-  try {
-    // Environment validation
-    const validation = validateEnvironment();
-    if (!validation.valid) {
-      throw new Error('Environment validation failed. See logs for details.');
-    }
+// Graceful shutdown function (defined outside to avoid scope issues)
+let serverInstance = null;
 
-    if (config.env === 'production') {
-      logger.info('🔒 Production mode enabled');
-    } else {
-      logger.info('🛠️  Development mode enabled');
-    }
-
-    // Connect to database
-    await database.connect();
-    logger.info('Database connected successfully');
-
-    // ── Start HTTP server FIRST — keeps the event loop alive unconditionally ──
-    const server = app.listen(config.port, config.host, () => {
-      logger.info(`🚀 Server running on ${config.host}:${config.port}`);
-      logger.info(`📚 ${config.app.name}`);
-      logger.info(`🌍 Environment: ${config.env}`);
-      logger.info(`🏥 Health check: http://${config.host}:${config.port}/health`);
-
-      // ── Start WhatsApp INSIDE the listen callback ─────────────────────────
-      // This guarantees the HTTP server is fully bound before Chromium/puppeteer
-      // starts.  Any WhatsApp failure here CANNOT crash the already-listening
-      // server because the event loop is kept alive by the server socket.
-      if (!config.whatsapp.disabled) {
-        logger.info('🤳 Starting WhatsApp client setup (async, non-blocking)…');
-        setupWhatsApp()
-          .then((client) => {
-            if (client) {
-              logger.info('🤳 WhatsApp client initialisation started — waiting for QR scan…');
-            } else {
-              logger.warn('🤳 WhatsApp setup returned null — running without WhatsApp');
-            }
-          })
-          .catch((err) => {
-            // setupWhatsApp already swallows errors internally; this is extra safety
-            logger.error('WhatsApp setup rejected (server continues):', err.message);
-          });
-      } else {
-        logger.info('🤳 WhatsApp disabled — skipping');
+const gracefulShutdown = async (signal) => {
+  logger.info(`${signal} received. Starting graceful shutdown...`);
+  
+  if (serverInstance) {
+    serverInstance.close(async () => {
+      logger.info('HTTP server closed');
+      
+      try {
+        await database.disconnect();
+        logger.info('Database disconnected');
+        process.exit(0);
+      } catch (err) {
+        logger.error('Error during shutdown:', err);
+        process.exit(1);
       }
     });
-
-    // Start cron jobs (pure in-process timers — no risk of crashing server)
-    startCronJobs();
-
-    // Graceful shutdown
-    const gracefulShutdown = async (signal) => {
-      logger.info(`${signal} received. Starting graceful shutdown...`);
-      
-      server.close(async () => {
-        logger.info('HTTP server closed');
-        
-        try {
-          await database.disconnect();
-          logger.info('Database disconnected');
-          process.exit(0);
-        } catch (err) {
-          logger.error('Error during shutdown:', err);
-          process.exit(1);
-        }
-      });
-
-      // Force shutdown after 10 seconds
-      setTimeout(() => {
-        logger.error('Forced shutdown after timeout');
-        process.exit(1);
-      }, 10000);
-    };
-
-    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-
-  } catch (error) {
-    logger.error('Failed to start server:', error);
-    process.exit(1);
+  } else {
+    process.exit(0);
   }
+
+  // Force shutdown after 10 seconds
+  setTimeout(() => {
+    logger.error('Forced shutdown after timeout');
+    process.exit(1);
+  }, 10000);
+};
+
+// Set up signal handlers at the top level
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// Environment validation
+const validation = validateEnvironment();
+if (!validation.valid) {
+  console.error('Environment validation failed. See logs for details.');
+  process.exit(1);
 }
 
-startServer();
+if (config.env === 'production') {
+  logger.info('🔒 Production mode enabled');
+} else {
+  logger.info('🛠️  Development mode enabled');
+}
+
+// Keep the process alive by making the main execution async and never resolving
+(async () => {
+  // Start the server immediately to keep the process alive
+  console.log('Starting server immediately...');
+  serverInstance = app.listen(config.port, config.host);
+
+  console.log(`🚀 Server running on ${config.host}:${config.port}`);
+  console.log(`📚 ${config.app.name}`);
+  console.log(`🌍 Environment: ${config.env}`);
+  console.log(`🏥 Health check: http://${config.host}:${config.port}/health`);
+  console.log('Server started successfully');
+
+  // Connect to database asynchronously (non-blocking)
+  database.connect().then(() => {
+    console.log('Database connected successfully');
+
+    // ── Start WhatsApp (async, non-blocking) ─────────────────────────
+    if (!config.whatsapp.disabled) {
+      console.log('🤳 Starting WhatsApp client setup (async, non-blocking)…');
+      setupWhatsApp()
+        .then((client) => {
+          if (client) {
+            console.log('🤳 WhatsApp client initialisation started — waiting for QR scan…');
+          } else {
+            console.log('🤳 WhatsApp setup returned null — running without WhatsApp');
+          }
+        })
+        .catch((err) => {
+          console.error('WhatsApp setup rejected (server continues):', err.message);
+        });
+    } else {
+      console.log('🤳 WhatsApp disabled — skipping');
+    }
+
+    // Start cron jobs (pure in-process timers — no risk of crashing server)
+    console.log('Starting cron jobs...');
+    try {
+      startCronJobs();
+      console.log('Cron jobs started');
+    } catch (error) {
+      console.error('Failed to start cron jobs:', error);
+    }
+
+    console.log('Server initialization complete');
+  }).catch(err => {
+    console.error('Failed to connect to database:', err);
+    console.error('Database connection failed, but server continues running');
+  });
+
+  // Keep the async function from ever resolving
+  await new Promise(() => {});
+})();

@@ -75,6 +75,8 @@ async function sendWhatsApp(mobile, message) {
   }
 }
 
+export { sendWhatsApp };
+
 export async function send(opts = {}) {
   const {
     recipient, type, title, body,

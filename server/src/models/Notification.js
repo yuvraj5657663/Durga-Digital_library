@@ -7,7 +7,7 @@ const notificationSchema = new mongoose.Schema(
       type: String,
       enum: ['renewal_reminder', 'membership_activated', 'membership_expired',
              'announcement', 'payment_received', 'attendance_marked',
-             'password_reset', 'custom'],
+             'password_reset', 'custom', 'admission_inquiry', 'admission_inquiry_alert'],
       required: true,
       index: true
     },

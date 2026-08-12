@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import ProtectedRoute from './components/shared/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
+import LandingPage from './pages/LandingPage';
 import AdminLayout from './components/admin/AdminLayout';
 import StudentLayout from './components/student/StudentLayout';
 
@@ -18,6 +19,7 @@ function AppRoutes() {
 
   return (
     <Routes>
+      <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       
       {/* Admin Routes */}
@@ -42,7 +44,7 @@ function AppRoutes() {
       
       {/* Default redirect based on role */}
       <Route
-        path="/"
+        path="/dashboard"
         element={
           isAuthenticated ? (
             <Navigate to={isAdmin ? '/admin' : '/student'} replace />
