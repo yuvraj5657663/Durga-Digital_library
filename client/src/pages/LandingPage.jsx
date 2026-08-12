@@ -112,7 +112,7 @@ const LandingPage = () => {
     },
     {
       name: "Afternoon Shift",
-      time: "12:00 PM - 6:00 PM",
+      time: "11:00 AM - 4:00 PM",
       price: "₹350/month",
       features: ["AC Environment", "High-Speed WiFi", "Personal Locker", "Charging Points"],
       popular: false
@@ -824,7 +824,7 @@ const LandingPage = () => {
                       >
                         <option value="Special 6-Hour">Special 6-Hour (10AM-4PM) - ₹350/month</option>
                         <option value="Morning">Morning (6AM-11AM) - ₹350/month</option>
-                        <option value="Afternoon">Afternoon (12PM-6PM) - ₹350/month</option>
+                        <option value="Afternoon">Afternoon (11AM-4PM) - ₹350/month</option>
                         <option value="Evening">Evening (4PM-9PM) - ₹350/month</option>
                         <option value="Full Day">Full Day (6AM-9PM) - ₹800/month</option>
                       </select>
