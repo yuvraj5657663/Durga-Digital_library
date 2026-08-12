@@ -13,7 +13,7 @@ const LandingPage = () => {
     phone: '',
     whatsapp: '',
     address: '',
-    shift: 'Morning',
+    shift: 'Special 6-Hour',
     joiningDate: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -95,6 +95,15 @@ const LandingPage = () => {
 
   const timingPlans = [
     {
+      name: "Special 6-Hour Batch",
+      time: "10:00 AM - 4:00 PM",
+      price: "₹350/month",
+      specialOffer: "₹1,000 for 3 months (Save ₹50)",
+      features: ["6 Hours Study Time", "24/7 Available", "AC Environment", "High-Speed WiFi", "Personal Locker", "Charging Points"],
+      popular: true,
+      badge: "Special Offer"
+    },
+    {
       name: "Morning Shift",
       time: "6:00 AM - 12:00 PM",
       price: "₹800/month",
@@ -106,7 +115,7 @@ const LandingPage = () => {
       time: "2:00 PM - 8:00 PM",
       price: "₹800/month",
       features: ["AC Environment", "High-Speed WiFi", "Personal Locker", "Charging Points"],
-      popular: true
+      popular: false
     },
     {
       name: "Full Day",
@@ -171,7 +180,7 @@ const LandingPage = () => {
           phone: '',
           whatsapp: '',
           address: '',
-          shift: 'Morning',
+          shift: 'Special 6-Hour',
           joiningDate: ''
         });
       } else {
@@ -492,7 +501,7 @@ const LandingPage = () => {
             </p>
           </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
             {timingPlans.map((plan, index) => (
               <motion.div
                 key={index}
@@ -501,35 +510,43 @@ const LandingPage = () => {
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.1 }}
                 whileHover={{ y: -8 }}
-                className={`relative p-8 rounded-2xl border ${
+                className={`relative p-6 rounded-2xl border ${
                   plan.popular 
                     ? 'bg-gradient-to-br from-blue-600 to-purple-600 border-blue-400/30' 
                     : 'bg-slate-900 border-white/5'
                 }`}
               >
-                {plan.popular && (
+                {plan.badge && (
                   <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
                     <span className="px-4 py-1 bg-gradient-to-r from-yellow-400 to-orange-500 text-slate-900 text-sm font-bold rounded-full flex items-center space-x-1">
                       <Star className="w-4 h-4" />
-                      <span>Most Popular</span>
+                      <span>{plan.badge}</span>
                     </span>
                   </div>
                 )}
 
-                <h3 className={`text-2xl font-bold mb-2 ${plan.popular ? 'text-white' : 'text-white'}`}>
+                <h3 className={`text-xl font-bold mb-2 ${plan.popular ? 'text-white' : 'text-white'}`}>
                   {plan.name}
                 </h3>
-                <p className={`text-lg mb-4 ${plan.popular ? 'text-blue-100' : 'text-slate-400'}`}>
+                <p className={`text-base mb-3 ${plan.popular ? 'text-blue-100' : 'text-slate-400'}`}>
                   {plan.time}
                 </p>
-                <div className={`text-4xl font-bold mb-6 ${plan.popular ? 'text-white' : 'text-blue-400'}`}>
+                <div className={`text-3xl font-bold mb-4 ${plan.popular ? 'text-white' : 'text-blue-400'}`}>
                   {plan.price}
                 </div>
 
-                <ul className="space-y-3 mb-8">
+                {plan.specialOffer && (
+                  <div className="mb-4 p-3 bg-white/10 rounded-lg border border-white/20">
+                    <p className="text-sm text-green-300 font-semibold">
+                      🎉 {plan.specialOffer}
+                    </p>
+                  </div>
+                )}
+
+                <ul className="space-y-2 mb-6">
                   {plan.features.map((feature, idx) => (
-                    <li key={idx} className="flex items-center space-x-3">
-                      <Check className={`w-5 h-5 ${plan.popular ? 'text-green-300' : 'text-blue-400'}`} />
+                    <li key={idx} className="flex items-center space-x-2 text-sm">
+                      <Check className={`w-4 h-4 flex-shrink-0 ${plan.popular ? 'text-green-300' : 'text-blue-400'}`} />
                       <span className={plan.popular ? 'text-white' : 'text-slate-300'}>{feature}</span>
                     </li>
                   ))}
@@ -539,7 +556,7 @@ const LandingPage = () => {
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => setIsModalOpen(true)}
-                  className={`w-full py-3 rounded-xl font-semibold transition-all ${
+                  className={`w-full py-3 rounded-xl font-semibold transition-all text-sm ${
                     plan.popular 
                       ? 'bg-white text-blue-600 hover:bg-blue-50' 
                       : 'bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:shadow-lg hover:shadow-blue-500/30'
@@ -798,10 +815,11 @@ const LandingPage = () => {
                         required
                         className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-white"
                       >
-                        <option value="Morning">Morning (6AM-12PM)</option>
-                        <option value="Afternoon">Afternoon (12PM-6PM)</option>
-                        <option value="Evening">Evening (2PM-8PM)</option>
-                        <option value="Full Day">Full Day (6AM-8PM)</option>
+                        <option value="Special 6-Hour">Special 6-Hour (10AM-4PM) - ₹350/month</option>
+                        <option value="Morning">Morning (6AM-12PM) - ₹800/month</option>
+                        <option value="Afternoon">Afternoon (12PM-6PM) - ₹800/month</option>
+                        <option value="Evening">Evening (2PM-8PM) - ₹800/month</option>
+                        <option value="Full Day">Full Day (6AM-8PM) - ₹1,200/month</option>
                       </select>
                     </div>
 
