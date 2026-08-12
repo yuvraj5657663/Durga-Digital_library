@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
 import { BookOpen, Clock, Wifi, Shield, Users, Zap, Phone, MapPin, X, ArrowRight, Sparkles, Cpu, Armchair, Lock, BatteryCharging, Monitor, ChevronRight, Star, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { admissionInquiryService } from '../services/admissionInquiryService';
 
 const LandingPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -203,10 +202,18 @@ const LandingPage = () => {
         return;
       }
 
-      // Use admissionInquiryService for API call
-      const response = await admissionInquiryService.create(formData);
+      // Use direct fetch for debugging
+      const response = await fetch('/api/v1/admission/inquiry', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
 
-      if (response.success || response.data) {
+      const data = await response.json();
+
+      if (response.ok) {
         toast.success('Application submitted successfully! We will contact you soon.');
         setIsModalOpen(false);
         setFormData({
@@ -218,11 +225,12 @@ const LandingPage = () => {
           joiningDate: ''
         });
       } else {
-        toast.error(response.message || 'Failed to submit application');
+        toast.error(data.message || 'Failed to submit application');
       }
     } catch (error) {
-      const errorMessage = error.response?.data?.message || error.message || 'Network error. Please try again.';
+      const errorMessage = error.message || 'Network error. Please try again.';
       toast.error(errorMessage);
+      console.error('Submission error:', error);
     } finally {
       setIsSubmitting(false);
     }
