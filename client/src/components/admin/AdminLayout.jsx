@@ -8,7 +8,7 @@ import {
   FileText, LogOut, Menu, X, Bell, Check, UserPlus
 } from 'lucide-react';
 import { notificationService } from '../../services/notificationService';
-import axios from 'axios';
+import api from '../../services/api';
 
 // Real page components
 import AdminDashboard    from '../../pages/admin/AdminDashboard';
@@ -26,13 +26,11 @@ const AdminLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
 
-  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
-
   // Fetch pending admission inquiries count
   const { data: pendingAdmissionsData } = useQuery({
     queryKey: ['admission-inquiries-pending-count'],
     queryFn: async () => {
-      const response = await axios.get(`${API_BASE}/admission/admissions/pending-count`);
+      const response = await api.get('/admission/admissions/pending-count');
       return response.data;
     },
     refetchInterval: 30000,
