@@ -105,22 +105,29 @@ const LandingPage = () => {
     },
     {
       name: "Morning Shift",
-      time: "6:00 AM - 12:00 PM",
-      price: "₹800/month",
+      time: "6:00 AM - 11:00 AM",
+      price: "₹350/month",
+      features: ["AC Environment", "High-Speed WiFi", "Personal Locker", "Charging Points"],
+      popular: false
+    },
+    {
+      name: "Afternoon Shift",
+      time: "12:00 PM - 6:00 PM",
+      price: "₹350/month",
       features: ["AC Environment", "High-Speed WiFi", "Personal Locker", "Charging Points"],
       popular: false
     },
     {
       name: "Evening Shift",
-      time: "2:00 PM - 8:00 PM",
-      price: "₹800/month",
+      time: "4:00 PM - 9:00 PM",
+      price: "₹350/month",
       features: ["AC Environment", "High-Speed WiFi", "Personal Locker", "Charging Points"],
       popular: false
     },
     {
       name: "Full Day",
-      time: "6:00 AM - 8:00 PM",
-      price: "₹1,200/month",
+      time: "6:00 AM - 9:00 PM",
+      price: "₹800/month",
       features: ["All Day Access", "Priority Seating", "All Morning Features", "All Evening Features"],
       popular: false
     }
@@ -501,7 +508,7 @@ const LandingPage = () => {
             </p>
           </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 max-w-7xl mx-auto">
             {timingPlans.map((plan, index) => (
               <motion.div
                 key={index}
@@ -816,10 +823,10 @@ const LandingPage = () => {
                         className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-white"
                       >
                         <option value="Special 6-Hour">Special 6-Hour (10AM-4PM) - ₹350/month</option>
-                        <option value="Morning">Morning (6AM-12PM) - ₹800/month</option>
-                        <option value="Afternoon">Afternoon (12PM-6PM) - ₹800/month</option>
-                        <option value="Evening">Evening (2PM-8PM) - ₹800/month</option>
-                        <option value="Full Day">Full Day (6AM-8PM) - ₹1,200/month</option>
+                        <option value="Morning">Morning (6AM-11AM) - ₹350/month</option>
+                        <option value="Afternoon">Afternoon (12PM-6PM) - ₹350/month</option>
+                        <option value="Evening">Evening (4PM-9PM) - ₹350/month</option>
+                        <option value="Full Day">Full Day (6AM-9PM) - ₹800/month</option>
                       </select>
                     </div>
 
