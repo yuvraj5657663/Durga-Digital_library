@@ -8,7 +8,7 @@ import {
   FileText, LogOut, Menu, X, Bell, Check, UserPlus
 } from 'lucide-react';
 import { notificationService } from '../../services/notificationService';
-import api from '../../services/api';
+import api, { API_BASE } from '../../services/api';
 
 // Real page components
 import AdminDashboard    from '../../pages/admin/AdminDashboard';
@@ -30,7 +30,7 @@ const AdminLayout = () => {
   const { data: pendingAdmissionsData } = useQuery({
     queryKey: ['admission-inquiries-pending-count'],
     queryFn: async () => {
-      const response = await api.get('/admission/admissions/pending-count');
+      const response = await api.get(`${API_BASE}/admission/admissions/pending-count`);
       return response.data;
     },
     refetchInterval: 30000,

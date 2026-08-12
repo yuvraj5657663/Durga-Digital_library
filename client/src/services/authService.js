@@ -5,7 +5,7 @@
  * instead of raw localStorage so multi-tab sessions never overwrite each other.
  */
 
-import api from './api';
+import api, { API_BASE } from './api';
 import {
   saveSession,
   clearSession,
@@ -19,7 +19,7 @@ export const authService = {
    * Returns the user object (matches what the server sends).
    */
   login: async (credentials) => {
-    const response = await api.post('/auth/login', credentials);
+    const response = await api.post(`${API_BASE}/auth/login`, credentials);
     const { accessToken, refreshToken, user } = response.data.data || response.data;
 
     if (!accessToken || !user) {
@@ -40,7 +40,7 @@ export const authService = {
   logout: async () => {
     const user = getUser();  // read before clearing
     try {
-      await api.post('/auth/logout');
+      await api.post(`${API_BASE}/auth/logout`);
     } catch {
       // Server-side logout failure is non-fatal
     } finally {
@@ -52,19 +52,19 @@ export const authService = {
 
   /** Fetch the authenticated user's profile from the server. */
   getCurrentUser: async () => {
-    const response = await api.get('/auth/me');
+    const response = await api.get(`${API_BASE}/auth/me`);
     return response.data.data || response.data;
   },
 
   /** Change password for the currently authenticated user. */
   changePassword: async (passwords) => {
-    const response = await api.post('/auth/change-password', passwords);
+    const response = await api.post(`${API_BASE}/auth/change-password`, passwords);
     return response.data.data;
   },
 
   /** Register a new user (admin-initiated student registration). */
   register: async (userData) => {
-    const response = await api.post('/auth/register', userData);
+    const response = await api.post(`${API_BASE}/auth/register`, userData);
     return response.data.data;
   },
 };
