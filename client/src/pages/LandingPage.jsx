@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
-import { BookOpen, Clock, Wifi, Shield, Users, Zap, Phone, MapPin, X, ArrowRight, Sparkles, Cpu, Armchair, Lock, BatteryCharging, Monitor, ChevronRight, Star, Check } from 'lucide-react';
+import { Clock, Wifi, Shield, Users, Zap, Phone, MapPin, X, ArrowRight, Sparkles, Cpu, Armchair, Lock, BatteryCharging, Monitor, ChevronRight, Star, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const LandingPage = () => {
@@ -290,24 +290,16 @@ const LandingPage = () => {
               className="flex items-center space-x-3"
             >
               <div className="relative">
-                <BookOpen className="h-10 w-10 text-blue-400" />
-                <motion.div
-                  animate={{
-                    scale: [1, 1.2, 1],
-                    rotate: [0, 180, 360]
-                  }}
-                  transition={{
-                    duration: 3,
-                    repeat: Infinity,
-                    ease: "easeInOut"
-                  }}
-                  className="absolute -top-1 -right-1 w-3 h-3 bg-gradient-to-r from-blue-400 to-purple-500 rounded-full"
+                <img 
+                  src="/logo.png" 
+                  alt="Durga Digital Library Logo" 
+                  className="h-10 w-auto"
                 />
               </div>
               <div>
-                <h2 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+                <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
                   Durga Digital Library
-                </h2>
+                </h1>
                 <p className="text-xs text-slate-400">Modern Learning Environment</p>
               </div>
             </motion.div>
@@ -690,7 +682,11 @@ const LandingPage = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
             <div>
               <div className="flex items-center space-x-3 mb-6">
-                <BookOpen className="h-10 w-10 text-blue-400" />
+                <img 
+                  src="/logo.png" 
+                  alt="Durga Digital Library Logo" 
+                  className="h-10 w-auto"
+                />
                 <div>
                   <h2 className="text-xl font-bold text-white">Durga Digital Library</h2>
                   <p className="text-sm text-slate-400">Modern Learning Environment</p>

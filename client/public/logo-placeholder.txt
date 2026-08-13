@@ -1,0 +1,17 @@
+# Logo Files Setup Instructions
+
+## Files Needed:
+1. logo.png - Main logo image (save your provided logo as this file)
+2. favicon.ico - Square favicon (512x512px) 
+3. logo192.png - Apple touch icon (192x192px)
+
+## Steps:
+1. Save the provided logo image as: client/public/logo.png
+2. Create a square version (512x512px) and save as: client/public/favicon.ico
+3. Create a 192x192px version and save as: client/public/logo192.png
+4. Remove this placeholder file
+
+## Logo Sources:
+- Main logo: Provided in the image
+- Favicon: Extract the main icon element from the logo
+- Apple icon: Square version of the logo
