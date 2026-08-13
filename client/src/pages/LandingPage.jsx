@@ -305,9 +305,9 @@ const LandingPage = () => {
                 />
               </div>
               <div>
-                <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+                <h2 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
                   Durga Digital Library
-                </h1>
+                </h2>
                 <p className="text-xs text-slate-400">Modern Learning Environment</p>
               </div>
             </motion.div>
@@ -359,7 +359,7 @@ const LandingPage = () => {
           >
             <img
               src={slides[currentSlide].image}
-              alt={slides[currentSlide].title}
+              alt={`Durga Digital Library ${slides[currentSlide].title} - ${slides[currentSlide].subtitle}`}
               className="w-full h-full object-cover"
             />
             <div className={`absolute inset-0 bg-gradient-to-br ${slides[currentSlide].accent} opacity-80`} />
@@ -437,16 +437,16 @@ const LandingPage = () => {
               className="text-5xl md:text-7xl font-bold mb-6 leading-tight"
             >
               <span className="bg-gradient-to-r from-white via-blue-200 to-purple-200 bg-clip-text text-transparent">
-                {slides[currentSlide].title}
+                Durga Digital Library
               </span>
             </motion.h1>
 
-            <motion.p
+            <motion.h2
               variants={itemVariants}
               className="text-2xl md:text-3xl text-blue-200 mb-4 font-light"
             >
-              {slides[currentSlide].subtitle}
-            </motion.p>
+              {slides[currentSlide].title}
+            </motion.h2>
 
             <motion.p
               variants={itemVariants}
@@ -692,7 +692,7 @@ const LandingPage = () => {
               <div className="flex items-center space-x-3 mb-6">
                 <BookOpen className="h-10 w-10 text-blue-400" />
                 <div>
-                  <h3 className="text-xl font-bold text-white">Durga Digital Library</h3>
+                  <h2 className="text-xl font-bold text-white">Durga Digital Library</h2>
                   <p className="text-sm text-slate-400">Modern Learning Environment</p>
                 </div>
               </div>
@@ -728,7 +728,7 @@ const LandingPage = () => {
             </div>
 
             <div>
-              <h3 className="text-lg font-bold mb-6 text-white">Quick Links</h3>
+              <h4 className="text-lg font-bold mb-6 text-white">Quick Links</h4>
               <div className="space-y-3">
                 <button 
                   onClick={() => navigate('/login')}
@@ -781,7 +781,7 @@ const LandingPage = () => {
             </div>
 
             <div>
-              <h3 className="text-lg font-bold mb-6 text-white">Connect With Us</h3>
+              <h4 className="text-lg font-bold mb-6 text-white">Connect With Us</h4>
               <a
                 href="https://wa.me/917542893960"
                 target="_blank"
@@ -838,7 +838,7 @@ const LandingPage = () => {
               <div className="p-8">
                 <div className="flex justify-between items-center mb-8">
                   <div>
-                    <h2 className="text-2xl font-bold text-white mb-1">Online Admission</h2>
+                    <h3 className="text-2xl font-bold text-white mb-1">Online Admission</h3>
                     <p className="text-slate-400 text-sm">Fill in your details to get started</p>
                   </div>
                   <motion.button
