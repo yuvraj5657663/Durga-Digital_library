@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Phone, MessageCircle, Check, X, Trash2, Calendar, MapPin, Clock, BadgeCheck, RefreshCw } from 'lucide-react';
 import { admissionInquiryService } from '../../services/admissionInquiryService';
@@ -20,17 +21,30 @@ const statusBadge = (status) => (
 export default function OnlineAdmissionRequests() {
   const [filter, setFilter] = useState('all');
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
-  const { data: inquiriesData, isLoading, refetch } = useQuery({
+  const { data: inquiriesData, isLoading, refetch, error: inquiriesError } = useQuery({
     queryKey: ['admission-inquiries', filter],
     queryFn: () => admissionInquiryService.getAll(filter !== 'all' ? { status: filter } : {}),
     refetchInterval: 30000, // Refresh every 30 seconds
+    onError: (error) => {
+      if (error.response?.status === 401) {
+        toast.error('Session expired. Please login again.');
+        navigate('/login');
+      }
+    }
   });
 
-  const { data: pendingCountData } = useQuery({
+  const { data: pendingCountData, error: countError } = useQuery({
     queryKey: ['admission-inquiries-pending-count'],
     queryFn: admissionInquiryService.getPendingCount,
     refetchInterval: 30000,
+    onError: (error) => {
+      if (error.response?.status === 401) {
+        toast.error('Session expired. Please login again.');
+        navigate('/login');
+      }
+    }
   });
 
   const updateStatusMutation = useMutation({
@@ -42,7 +56,12 @@ export default function OnlineAdmissionRequests() {
       toast.success('Status updated successfully');
     },
     onError: (error) => {
-      toast.error(error.response?.data?.message || 'Failed to update status');
+      if (error.response?.status === 401) {
+        toast.error('Session expired. Please login again.');
+        navigate('/login');
+      } else {
+        toast.error(error.response?.data?.message || 'Failed to update status');
+      }
     }
   });
 
@@ -55,7 +74,12 @@ export default function OnlineAdmissionRequests() {
       toast.success('Inquiry deleted successfully');
     },
     onError: (error) => {
-      toast.error(error.response?.data?.message || 'Failed to delete inquiry');
+      if (error.response?.status === 401) {
+        toast.error('Session expired. Please login again.');
+        navigate('/login');
+      } else {
+        toast.error(error.response?.data?.message || 'Failed to delete inquiry');
+      }
     }
   });
 
@@ -158,6 +182,16 @@ export default function OnlineAdmissionRequests() {
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         {isLoading ? (
           <div className="p-8 text-center text-gray-500">Loading inquiries...</div>
+        ) : inquiriesError ? (
+          <div className="p-8 text-center text-red-500">
+            Failed to load inquiries. Please try refreshing.
+            <button
+              onClick={() => refetch()}
+              className="ml-2 text-blue-600 hover:underline"
+            >
+              Retry
+            </button>
+          </div>
         ) : filteredInquiries.length === 0 ? (
           <div className="p-8 text-center text-gray-500">
             No admission inquiries found

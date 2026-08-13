@@ -202,9 +202,7 @@ const LandingPage = () => {
         return;
       }
 
-      console.log('Submitting admission form:', formData);
-
-      // Use direct fetch for debugging
+      // Use direct fetch for public endpoint (no auth required)
       const response = await fetch('/api/v1/admission/inquiry', {
         method: 'POST',
         headers: {
@@ -214,7 +212,6 @@ const LandingPage = () => {
       });
 
       const data = await response.json();
-      console.log('Admission form response:', data);
 
       if (response.ok) {
         toast.success('Application submitted successfully! We will contact you soon.');
@@ -233,7 +230,6 @@ const LandingPage = () => {
     } catch (error) {
       const errorMessage = error.message || 'Network error. Please try again.';
       toast.error(errorMessage);
-      console.error('Submission error:', error);
     } finally {
       setIsSubmitting(false);
     }

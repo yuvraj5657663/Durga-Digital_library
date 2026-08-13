@@ -70,6 +70,8 @@ export const createAdmissionInquiryController = asyncHandler(async (req, res) =>
 export const listAdmissionInquiriesController = asyncHandler(async (req, res) => {
   const { page = 1, limit = 50, status } = req.query;
   
+  console.log('Fetching admission inquiries with filters:', { page, limit, status });
+  
   const filter = {};
   if (status) filter.status = status;
 
@@ -79,12 +81,15 @@ export const listAdmissionInquiriesController = asyncHandler(async (req, res) =>
     AdmissionInquiry.countDocuments(filter)
   ]);
 
+  console.log('Found inquiries:', inquiries.length, 'Total:', total);
   return paginatedResponse(res, inquiries, { page: parseInt(page), limit: parseInt(limit), total }, 'Admission inquiries retrieved');
 });
 
 export const updateAdmissionInquiryController = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
+
+  console.log('Updating admission inquiry:', id, 'to status:', status);
 
   if (!status) {
     throw new ValidationError('Status is required');
@@ -103,6 +108,7 @@ export const updateAdmissionInquiryController = asyncHandler(async (req, res) =>
     throw new ValidationError('Admission inquiry not found');
   }
 
+  console.log('Updated inquiry:', inquiry);
   return successResponse(res, inquiry, 'Admission inquiry status updated successfully');
 });
 
