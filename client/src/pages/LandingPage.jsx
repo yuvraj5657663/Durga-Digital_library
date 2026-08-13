@@ -290,11 +290,17 @@ const LandingPage = () => {
               className="flex items-center space-x-3"
             >
               <div className="relative">
-                <img 
-                  src="/logo.png" 
-                  alt="Durga Digital Library Logo" 
-                  className="h-10 w-auto"
-                />
+                {false ? (
+                  <img 
+                    src="/logo.png" 
+                    alt="Durga Digital Library Logo" 
+                    className="h-10 w-auto"
+                  />
+                ) : (
+                  <div className="h-10 w-10 bg-gradient-to-br from-blue-400 to-purple-500 rounded-lg flex items-center justify-center">
+                    <span className="text-white font-bold text-lg">DL</span>
+                  </div>
+                )}
               </div>
               <div>
                 <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
@@ -682,11 +688,17 @@ const LandingPage = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
             <div>
               <div className="flex items-center space-x-3 mb-6">
-                <img 
-                  src="/logo.png" 
-                  alt="Durga Digital Library Logo" 
-                  className="h-10 w-auto"
-                />
+                {false ? (
+                  <img 
+                    src="/logo.png" 
+                    alt="Durga Digital Library Logo" 
+                    className="h-10 w-auto"
+                  />
+                ) : (
+                  <div className="h-10 w-10 bg-gradient-to-br from-blue-400 to-purple-500 rounded-lg flex items-center justify-center">
+                    <span className="text-white font-bold text-lg">DL</span>
+                  </div>
+                )}
                 <div>
                   <h2 className="text-xl font-bold text-white">Durga Digital Library</h2>
                   <p className="text-sm text-slate-400">Modern Learning Environment</p>
