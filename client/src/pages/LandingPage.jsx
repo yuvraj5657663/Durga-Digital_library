@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
-import { Clock, Wifi, Shield, Users, Zap, Phone, MapPin, X, ArrowRight, Sparkles, Cpu, Armchair, Lock, BatteryCharging, Monitor, ChevronRight, Star, Check } from 'lucide-react';
+import { Clock, Wifi, Shield, Users, Zap, Phone, MapPin, X, ArrowRight, Sparkles, Cpu, Armchair, Lock, BatteryCharging, Monitor, ChevronRight, Star, Check, Library } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const LandingPage = () => {
@@ -50,7 +50,7 @@ const LandingPage = () => {
 
   const highlights = [
     { icon: Zap, text: "⚡ High-Speed Wi-Fi", color: "from-yellow-400 to-orange-500" },
-    { icon: BookOpen, text: "📚 10,000+ Books & Journals", color: "from-blue-400 to-indigo-500" },
+    { icon: Library, text: "📚 10,000+ Books & Journals", color: "from-blue-400 to-indigo-500" },
     { icon: Shield, text: "🤫 Quiet Study Zone", color: "from-green-400 to-emerald-500" },
     { icon: Clock, text: "🕐 24/7 Open", color: "from-purple-400 to-pink-500" }
   ];
