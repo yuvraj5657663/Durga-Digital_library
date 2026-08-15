@@ -41,6 +41,22 @@ function TodayAttendanceCard({ todayAttendance, isLoading, student }) {
   const now = new Date();
   const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
 
+  // Shift timing configuration (must match backend shiftConfig.js)
+  const SHIFT_CONFIG = {
+    'Shift 1': { startTime: '06:00', endTime: '11:00', description: 'Morning (6 AM – 11 AM)' },
+    'Shift 2': { startTime: '11:00', endTime: '16:00', description: 'Afternoon (11 AM – 4 PM)' },
+    'Shift 3': { startTime: '16:00', endTime: '21:00', description: 'Evening (4 PM – 9 PM)' },
+    'Shift 4': { startTime: '06:00', endTime: '21:00', description: 'Full Day (6 AM – 9 PM)' },
+    'Night Shift': { startTime: '21:00', endTime: '06:00', description: 'Night (9 PM – 6 AM)' },
+    'Custom': { startTime: null, endTime: null, description: 'Custom Shift' }
+  };
+
+  const studentShift = student?.shift || 'Shift 1';
+  const shiftConfig = SHIFT_CONFIG[studentShift] || SHIFT_CONFIG['Shift 1'];
+  const shiftTiming = shiftConfig.startTime && shiftConfig.endTime 
+    ? `${shiftConfig.startTime} - ${shiftConfig.endTime}`
+    : 'Custom Timing';
+
   const checkInMutation = useMutation({
     mutationFn: () => portalService.selfCheckIn(),
     onSuccess: (record) => {
@@ -74,7 +90,6 @@ function TodayAttendanceCard({ todayAttendance, isLoading, student }) {
   const checkInAt  = todayAttendance?.checkIn;
   const checkOutAt = todayAttendance?.checkOut;
   const duration   = todayAttendance?.durationMins;
-  const studentShift = student?.shift || 'Shift 1';
 
   return (
     <div className={`card flex flex-col gap-3 ${isCheckedOut ? 'border-l-4 border-blue-500' : isPresent ? 'border-l-4 border-green-500' : 'border-l-4 border-orange-400'}`}>
@@ -82,6 +97,7 @@ function TodayAttendanceCard({ todayAttendance, isLoading, student }) {
         <div>
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Today's Attendance</p>
           <p className="text-xs text-gray-400 mt-1">Shift: {studentShift}</p>
+          <p className="text-xs text-gray-400">Timing: {shiftTiming}</p>
           {isLoading
             ? <Sk className="h-6 w-24 mt-2" />
             : isCheckedOut

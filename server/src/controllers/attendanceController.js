@@ -4,7 +4,7 @@ import { successResponse, paginatedResponse } from '../utils/response.js';
 import { asyncHandler, NotFoundError, ValidationError } from '../utils/errors.js';
 import AuditLog from '../models/AuditLog.js';
 import { toActorId } from '../utils/actorId.js';
-import { validateCheckIn, validateCheckOut, getCurrentTime } from '../config/shiftConfig.js';
+import { getCurrentTime } from '../config/shiftConfig.js';
 
 export const listAttendanceController = asyncHandler(async (req, res) => {
   const { page = 1, limit = 50, date, shift, branch, studentId } = req.query;
@@ -54,21 +54,21 @@ export const markAttendanceController = asyncHandler(async (req, res) => {
     status = 'CHECKED_OUT';
   }
 
-  // Shift-based validation for check-in
-  if (inTime && !checkOut) {
-    const checkInValidation = validateCheckIn(studentShift, student.customTiming);
-    if (!checkInValidation.isValid) {
-      throw new ValidationError(checkInValidation.message);
-    }
-  }
+  // REMOVED: Shift-based validation for check-in - allow check-in at any time
+  // if (inTime && !checkOut) {
+  //   const checkInValidation = validateCheckIn(studentShift, student.customTiming);
+  //   if (!checkInValidation.isValid) {
+  //     throw new ValidationError(checkInValidation.message);
+  //   }
+  // }
 
-  // Shift-based validation for check-out
-  if (checkOut) {
-    const checkOutValidation = validateCheckOut(studentShift, student.customTiming);
-    if (!checkOutValidation.isValid) {
-      throw new ValidationError(checkOutValidation.message);
-    }
-  }
+  // REMOVED: Shift-based validation for check-out - allow check-out at any time
+  // if (checkOut) {
+  //   const checkOutValidation = validateCheckOut(studentShift, student.customTiming);
+  //   if (!checkOutValidation.isValid) {
+  //     throw new ValidationError(checkOutValidation.message);
+  //   }
+  // }
 
   let durationMins = 0;
   if (inTime && checkOut) {
@@ -142,12 +142,7 @@ export const scanQrAttendanceController = asyncHandler(async (req, res) => {
   let attendance;
 
   if (existing?.checkIn && !existing?.checkOut) {
-    // Check-out action - validate against shift
-    const checkOutValidation = validateCheckOut(studentShift, student.customTiming);
-    if (!checkOutValidation.isValid) {
-      throw new ValidationError(checkOutValidation.message);
-    }
-
+    // Check-out action - NO validation, allow check-out at any time
     const [ih, im] = existing.checkIn.split(':').map(Number);
     const [oh, om] = now.split(':').map(Number);
     const durationMins = Math.max(0, (oh * 60 + om) - (ih * 60 + im));
@@ -155,41 +150,36 @@ export const scanQrAttendanceController = asyncHandler(async (req, res) => {
       existing._id,
       {
         checkOut: now,
-        checkOutTimestamp: nowTimestamp, // NEW: Exact timestamp
+        checkOutTimestamp: nowTimestamp,
         durationMins,
         method: 'qr_scan',
-        status: 'CHECKED_OUT', // NEW: Update status
+        status: 'CHECKED_OUT',
         isValidated: true,
         validationMessage: ''
       },
       { new: true }
     );
   } else {
-    // Check-in action - validate against shift
-    const checkInValidation = validateCheckIn(studentShift, student.customTiming);
-    if (!checkInValidation.isValid) {
-      throw new ValidationError(checkInValidation.message);
-    }
-
+    // Check-in action - NO validation, allow check-in at any time
     attendance = await Attendance.findOneAndUpdate(
       { student: student._id, date },
       {
         $setOnInsert: { student: student._id, date },
         $set: {
           checkIn:  now,
-          checkInTimestamp: nowTimestamp, // NEW: Exact timestamp
+          checkInTimestamp: nowTimestamp,
           checkOut: '',
           checkOutTimestamp: null,
           durationMins: 0,
           method:   'qr_scan',
           shift:    studentShift,
-          shiftType: studentShift, // NEW: For shift-based validation
-          status: 'CHECKED_IN', // NEW: Set status
+          shiftType: studentShift,
+          status: 'CHECKED_IN',
           seatCode: student.seatCode || '',
           markedBy: toActorId(req.user?.id),
           branch:   student.branch   || '',
-          isValidated: true, // NEW: Validation passed
-          validationMessage: '' // NEW: No validation error
+          isValidated: true,
+          validationMessage: ''
         }
       },
       { upsert: true, new: true }

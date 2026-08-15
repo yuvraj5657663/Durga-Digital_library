@@ -1,13 +1,84 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { Search, CheckCircle, XCircle, Clock, RefreshCw, ChevronLeft, ChevronRight, Users, LogOut } from 'lucide-react';
+import { Search, CheckCircle, XCircle, Clock, RefreshCw, ChevronLeft, ChevronRight, Users, LogOut, AlertTriangle } from 'lucide-react';
 import { attendanceService } from '../../services/attendanceService';
 import { studentService } from '../../services/studentService';
 import { shiftService } from '../../services/shiftService';
 
 const today = new Date().toISOString().slice(0, 10);
 const LIMIT = 50;
+
+// Shift timing configuration (must match backend shiftConfig.js)
+const SHIFT_CONFIG = {
+  'Shift 1': { startTime: '06:00', endTime: '11:00', description: 'Morning (6 AM – 11 AM)' },
+  'Shift 2': { startTime: '11:00', endTime: '16:00', description: 'Afternoon (11 AM – 4 PM)' },
+  'Shift 3': { startTime: '16:00', endTime: '21:00', description: 'Evening (4 PM – 9 PM)' },
+  'Shift 4': { startTime: '06:00', endTime: '21:00', description: 'Full Day (6 AM – 9 PM)' },
+  'Night Shift': { startTime: '21:00', endTime: '06:00', description: 'Night (9 PM – 6 AM)' },
+  'Custom': { startTime: null, endTime: null, description: 'Custom Shift' }
+};
+
+// Helper function to convert time string to minutes
+function timeToMinutes(timeStr) {
+  if (!timeStr) return null;
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  return hours * 60 + minutes;
+}
+
+// Helper function to get current time in minutes
+function getCurrentMinutes() {
+  const now = new Date();
+  return now.getHours() * 60 + now.getMinutes();
+}
+
+// Helper function to determine attendance status
+function getAttendanceStatus(attendance, studentShift) {
+  if (!attendance?.checkIn) {
+    return { status: 'Absent', color: 'red', isOverstay: false };
+  }
+
+  const shiftConfig = SHIFT_CONFIG[studentShift] || SHIFT_CONFIG['Shift 1'];
+  const checkInMinutes = timeToMinutes(attendance.checkIn);
+  const shiftStartMinutes = timeToMinutes(shiftConfig.startTime);
+  const shiftEndMinutes = timeToMinutes(shiftConfig.endTime);
+  const currentMinutes = getCurrentMinutes();
+
+  // Determine if checked in
+  const isCheckedIn = !attendance.checkOut;
+  const isCheckedOut = !!attendance.checkOut;
+
+  // Late entry: check-in time is after shift start time
+  const isLateEntry = shiftStartMinutes && checkInMinutes > shiftStartMinutes;
+
+  // Overstay: current time > shift end time AND student has NOT checked out OR checked out late
+  const isOverstay = shiftEndMinutes && currentMinutes > shiftEndMinutes && isCheckedIn;
+  const isLateCheckout = shiftEndMinutes && attendance.checkOut && timeToMinutes(attendance.checkOut) > shiftEndMinutes;
+
+  if (isOverstay) {
+    return { status: 'Overstay / Shift Ended', color: 'red', isOverstay: true };
+  }
+
+  if (isLateCheckout) {
+    return { status: 'Late Check-out', color: 'orange', isOverstay: false };
+  }
+
+  if (isCheckedIn) {
+    if (isLateEntry) {
+      return { status: 'Late Entry', color: 'orange', isOverstay: false };
+    }
+    return { status: 'Present (In Shift)', color: 'green', isOverstay: false };
+  }
+
+  if (isCheckedOut) {
+    if (isLateEntry) {
+      return { status: 'Late Entry - Checked Out', color: 'blue', isOverstay: false };
+    }
+    return { status: 'Checked Out', color: 'blue', isOverstay: false };
+  }
+
+  return { status: 'Present', color: 'green', isOverstay: false };
+}
 
 export default function AttendancePage() {
   const qc      = useQueryClient();
@@ -16,6 +87,17 @@ export default function AttendancePage() {
   const [search,setSearch]= useState('');
   const [page,  setPage]  = useState(1);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Auto-refresh attendance every minute for real-time status updates
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (date === today) { // Only auto-refresh for today's attendance
+        refetchAttendance();
+      }
+    }, 60000); // Refresh every 60 seconds
+
+    return () => clearInterval(interval);
+  }, [date, today]);
 
   // Fetch dynamic shifts
   const { data: shiftsData } = useQuery({
@@ -198,7 +280,7 @@ export default function AttendancePage() {
           <table className="min-w-full text-sm">
             <thead className="bg-gray-50 border-b">
               <tr>
-                {['Seat','Name','Shift','Mobile','Check In','Check Out','Status','Action'].map(h => (
+                {['Seat','Name','Shift & Timing','Mobile','Check In','Check Out','Live Status','Action'].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">{h}</th>
                 ))}
               </tr>
@@ -220,29 +302,55 @@ export default function AttendancePage() {
                       const sid  = s._id || s.id;
                       const rec  = attMap[String(sid)];
                       const isPresent = !!rec?.checkIn;
+                      const studentShift = s.shift || 'Shift 1';
+                      const shiftConfig = SHIFT_CONFIG[studentShift] || SHIFT_CONFIG['Shift 1'];
+                      const { status: liveStatus, color: statusColor, isOverstay } = getAttendanceStatus(rec, studentShift);
+                      
                       // Check status field first, then fallback to checkIn/checkOut logic
                       const isCheckedIn = rec?.status === 'CHECKED_IN' || (rec?.checkIn && !rec?.checkOut);
                       const isCheckedOut = rec?.status === 'CHECKED_OUT' || (rec?.checkIn && rec?.checkOut);
+                      
+                      // Get status badge styling
+                      const getStatusBadge = () => {
+                        const colorMap = {
+                          'red': 'bg-red-100 text-red-700',
+                          'orange': 'bg-orange-100 text-orange-700',
+                          'green': 'bg-green-100 text-green-700',
+                          'blue': 'bg-blue-100 text-blue-700'
+                        };
+                        const iconMap = {
+                          'red': <AlertTriangle className="w-3 h-3" />,
+                          'orange': <Clock className="w-3 h-3" />,
+                          'green': <CheckCircle className="w-3 h-3" />,
+                          'blue': <CheckCircle className="w-3 h-3" />
+                        };
+                        
+                        return (
+                          <span className={`inline-flex items-center gap-1 text-xs font-semibold ${colorMap[statusColor]} px-2 py-0.5 rounded-full`}>
+                            {iconMap[statusColor]} {liveStatus}
+                          </span>
+                        );
+                      };
+                      
                       return (
-                        <tr key={sid} className={`hover:bg-gray-50 ${isPresent ? 'bg-green-50/30' : ''}`}>
+                        <tr key={sid} className={`hover:bg-gray-50 ${isOverstay ? 'bg-red-50' : isPresent ? 'bg-green-50/30' : ''}`}>
                           <td className="px-4 py-3 font-mono text-xs text-gray-500">{s.seatCode || '—'}</td>
                           <td className="px-4 py-3 font-medium text-gray-900">{s.name}</td>
-                          <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{s.shift || '—'}</td>
+                          <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
+                            <div className="flex flex-col">
+                              <span className="text-xs font-medium">{studentShift}</span>
+                              <span className="text-[10px] text-gray-400">
+                                {shiftConfig.startTime && shiftConfig.endTime 
+                                  ? `${shiftConfig.startTime} - ${shiftConfig.endTime}`
+                                  : 'Custom Timing'}
+                              </span>
+                            </div>
+                          </td>
                           <td className="px-4 py-3 text-gray-500">{s.mobile}</td>
                           <td className="px-4 py-3 text-gray-600">{rec?.checkIn || '—'}</td>
                           <td className="px-4 py-3 text-gray-600">{rec?.checkOut || '—:—'}</td>
                           <td className="px-4 py-3">
-                            {isCheckedIn
-                              ? <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
-                                  <Clock className="w-3 h-3" /> Checked In
-                                </span>
-                              : isCheckedOut
-                              ? <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
-                                  <CheckCircle className="w-3 h-3" /> Checked Out
-                                </span>
-                              : <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
-                                  <XCircle className="w-3 h-3" /> Absent
-                                </span>}
+                            {getStatusBadge()}
                           </td>
                           <td className="px-4 py-3">
                             {!isPresent && (
