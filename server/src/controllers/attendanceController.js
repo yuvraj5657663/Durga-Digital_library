@@ -4,7 +4,6 @@ import { successResponse, paginatedResponse } from '../utils/response.js';
 import { asyncHandler, NotFoundError, ValidationError } from '../utils/errors.js';
 import AuditLog from '../models/AuditLog.js';
 import { toActorId } from '../utils/actorId.js';
-import { getCurrentTime } from '../config/shiftConfig.js';
 
 export const listAttendanceController = asyncHandler(async (req, res) => {
   const { page = 1, limit = 50, date, shift, branch, studentId } = req.query;
@@ -42,33 +41,18 @@ export const markAttendanceController = asyncHandler(async (req, res) => {
   const student = await Student.findById(studentId);
   if (!student) throw new NotFoundError('Student not found');
 
-  const attendDate = date     || new Date().toISOString().slice(0, 10);
-  const inTime     = checkIn  || getCurrentTime();
+  const attendDate = date || new Date().toISOString().slice(0, 10);
+  const nowTimestamp = new Date();
+  const inTime = checkIn || nowTimestamp.toTimeString().slice(0, 5);
   const studentShift = shift || student.shift || '';
 
-  // Determine status based on checkIn/checkOut
+  // Pure timestamp logging - NO time restrictions
   let status = 'ABSENT';
   if (inTime && !checkOut) {
     status = 'CHECKED_IN';
   } else if (inTime && checkOut) {
     status = 'CHECKED_OUT';
   }
-
-  // REMOVED: Shift-based validation for check-in - allow check-in at any time
-  // if (inTime && !checkOut) {
-  //   const checkInValidation = validateCheckIn(studentShift, student.customTiming);
-  //   if (!checkInValidation.isValid) {
-  //     throw new ValidationError(checkInValidation.message);
-  //   }
-  // }
-
-  // REMOVED: Shift-based validation for check-out - allow check-out at any time
-  // if (checkOut) {
-  //   const checkOutValidation = validateCheckOut(studentShift, student.customTiming);
-  //   if (!checkOutValidation.isValid) {
-  //     throw new ValidationError(checkOutValidation.message);
-  //   }
-  // }
 
   let durationMins = 0;
   if (inTime && checkOut) {
@@ -77,42 +61,40 @@ export const markAttendanceController = asyncHandler(async (req, res) => {
     durationMins = Math.max(0, (oh * 60 + om) - (ih * 60 + im));
   }
 
-  const now = new Date();
   const attendance = await Attendance.findOneAndUpdate(
     { student: studentId, date: attendDate },
     {
       $setOnInsert: { student: studentId, date: attendDate },
       $set: {
-        checkIn:             inTime,
-        checkOut:            checkOut || '',
-        checkInTimestamp:    checkIn ? now : null, // NEW: Exact timestamp
-        checkOutTimestamp:   checkOut ? now : null, // NEW: Exact timestamp
+        checkIn: inTime,
+        checkOut: checkOut || '',
+        checkInTimestamp: checkIn ? nowTimestamp : null,
+        checkOutTimestamp: checkOut ? nowTimestamp : null,
         durationMins,
-        method:              method    || 'manual',
-        shift:               studentShift,
-        shiftType:           studentShift, // NEW: For shift-based validation
-        status,              // NEW: Set status based on check-in/out
-        seatCode:            seatCode  || student.seatCode  || '',
-        markedBy:            toActorId(req.user.id),
-        notes:               notes || '',
-        branch:              student.branch || '',
-        isValidated:         true, // NEW: Validation passed
-        validationMessage:   '' // NEW: No validation error
+        method: method || 'manual',
+        shift: studentShift,
+        shiftType: studentShift,
+        status,
+        seatCode: seatCode || student.seatCode || '',
+        markedBy: toActorId(req.user.id),
+        notes: notes || '',
+        branch: student.branch || '',
+        isValidated: true,
+        validationMessage: ''
       }
     },
     { upsert: true, new: true }
   );
 
-  // AuditLog.actorId is also ObjectId — use toActorId
   await AuditLog.create({
-    action:     'attendance_marked',
-    actorId:    toActorId(req.user.id),
-    actorRole:  req.user.role,
-    actorName:  req.user.username,
+    action: 'attendance_marked',
+    actorId: toActorId(req.user.id),
+    actorRole: req.user.role,
+    actorName: req.user.username,
     targetType: 'Attendance',
-    targetId:   attendance._id.toString(),
+    targetId: attendance._id.toString(),
     targetName: `${student.name} - ${attendDate}`,
-    details:    { method, checkIn: inTime, checkOut, durationMins, shift: studentShift, status }
+    details: { method, checkIn: inTime, checkOut, durationMins, shift: studentShift, status }
   });
 
   return successResponse(res, attendance, 'Attendance marked successfully');
@@ -120,7 +102,7 @@ export const markAttendanceController = asyncHandler(async (req, res) => {
 
 export const scanQrAttendanceController = asyncHandler(async (req, res) => {
   // Accepts GET (QR scan) or POST
-  const sid  = req.query.sid  || req.body.sid  || req.body.studentId;
+  const sid = req.query.sid || req.body.sid || req.body.studentId;
   const date = req.query.date || req.body.date || new Date().toISOString().slice(0, 10);
 
   if (!sid) throw new NotFoundError('studentId (sid) is required');
@@ -133,8 +115,8 @@ export const scanQrAttendanceController = asyncHandler(async (req, res) => {
 
   if (!student) throw new NotFoundError('Student not found');
 
-  const now = getCurrentTime();
   const nowTimestamp = new Date();
+  const now = nowTimestamp.toTimeString().slice(0, 5);
   const studentShift = student.shift || '';
 
   // Toggle: if already checked in with no checkout → check out; else check in
@@ -142,7 +124,7 @@ export const scanQrAttendanceController = asyncHandler(async (req, res) => {
   let attendance;
 
   if (existing?.checkIn && !existing?.checkOut) {
-    // Check-out action - NO validation, allow check-out at any time
+    // Check-out action - Pure timestamp logging, NO validation
     const [ih, im] = existing.checkIn.split(':').map(Number);
     const [oh, om] = now.split(':').map(Number);
     const durationMins = Math.max(0, (oh * 60 + om) - (ih * 60 + im));
@@ -160,24 +142,24 @@ export const scanQrAttendanceController = asyncHandler(async (req, res) => {
       { new: true }
     );
   } else {
-    // Check-in action - NO validation, allow check-in at any time
+    // Check-in action - Pure timestamp logging, NO validation
     attendance = await Attendance.findOneAndUpdate(
       { student: student._id, date },
       {
         $setOnInsert: { student: student._id, date },
         $set: {
-          checkIn:  now,
+          checkIn: now,
           checkInTimestamp: nowTimestamp,
           checkOut: '',
           checkOutTimestamp: null,
           durationMins: 0,
-          method:   'qr_scan',
-          shift:    studentShift,
+          method: 'qr_scan',
+          shift: studentShift,
           shiftType: studentShift,
           status: 'CHECKED_IN',
           seatCode: student.seatCode || '',
           markedBy: toActorId(req.user?.id),
-          branch:   student.branch   || '',
+          branch: student.branch || '',
           isValidated: true,
           validationMessage: ''
         }
@@ -187,24 +169,24 @@ export const scanQrAttendanceController = asyncHandler(async (req, res) => {
   }
 
   await AuditLog.create({
-    action:     'attendance_qr_scan',
-    actorId:    toActorId(req.user?.id),
-    actorRole:  req.user?.role   || 'system',
-    actorName:  req.user?.username || 'QR',
+    action: 'attendance_qr_scan',
+    actorId: toActorId(req.user?.id),
+    actorRole: req.user?.role || 'system',
+    actorName: req.user?.username || 'QR',
     targetType: 'Attendance',
-    targetId:   attendance._id.toString(),
+    targetId: attendance._id.toString(),
     targetName: `${student.name} - ${date}`,
-    details:    { 
-      method: 'qr_scan', 
-      checkIn: now, 
+    details: {
+      method: 'qr_scan',
+      checkIn: now,
       action: existing?.checkIn && !existing?.checkOut ? 'checkout' : 'checkin',
-      shift: studentShift 
+      shift: studentShift
     }
   });
 
   return successResponse(res, {
-    action:  existing?.checkIn && !existing?.checkOut ? 'checked_out' : 'checked_in',
-    time:    now,
+    action: existing?.checkIn && !existing?.checkOut ? 'checked_out' : 'checked_in',
+    time: now,
     student: { name: student.name, studentId: student.studentId, seatCode: student.seatCode, shift: studentShift },
     attendance
   }, 'QR attendance processed');
@@ -238,14 +220,12 @@ export const getAttendanceStatsController = asyncHandler(async (req, res) => {
 export const checkoutAttendanceController = asyncHandler(async (req, res) => {
   const { attendanceId, studentId } = req.body;
 
-  console.log('Checkout request:', { attendanceId, studentId });
-
   if (!attendanceId && !studentId) {
     throw new ValidationError('Either attendanceId or studentId is required');
   }
 
-  const now = getCurrentTime();
   const nowTimestamp = new Date();
+  const now = nowTimestamp.toTimeString().slice(0, 5);
 
   let attendance;
   if (attendanceId) {
@@ -257,8 +237,6 @@ export const checkoutAttendanceController = asyncHandler(async (req, res) => {
     if (!attendance) throw new NotFoundError('No attendance record found for today');
   }
 
-  console.log('Found attendance:', attendance);
-
   if (!attendance.checkIn) {
     throw new ValidationError('Student has not checked in yet');
   }
@@ -267,7 +245,7 @@ export const checkoutAttendanceController = asyncHandler(async (req, res) => {
     throw new ValidationError('Student has already checked out');
   }
 
-  // Calculate duration
+  // Pure timestamp logging - NO time restrictions
   const [ih, im] = attendance.checkIn.split(':').map(Number);
   const [oh, om] = now.split(':').map(Number);
   const durationMins = Math.max(0, (oh * 60 + om) - (ih * 60 + im));
@@ -278,18 +256,16 @@ export const checkoutAttendanceController = asyncHandler(async (req, res) => {
   attendance.status = 'CHECKED_OUT';
   await attendance.save();
 
-  console.log('Updated attendance:', attendance);
-
   // Audit log
   await AuditLog.create({
-    action:     'attendance_checkout',
-    actorId:    toActorId(req.user.id),
-    actorRole:  req.user.role,
-    actorName:  req.user.username,
+    action: 'attendance_checkout',
+    actorId: toActorId(req.user.id),
+    actorRole: req.user.role,
+    actorName: req.user.username,
     targetType: 'Attendance',
-    targetId:   attendance._id.toString(),
+    targetId: attendance._id.toString(),
     targetName: `Checkout - ${attendance.date}`,
-    details:    { checkOut: now, durationMins }
+    details: { checkOut: now, durationMins }
   });
 
   return successResponse(res, attendance, 'Student checked out successfully');

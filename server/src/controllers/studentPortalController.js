@@ -10,7 +10,6 @@ import { getForStudent, markRead } from '../services/notificationService.js';
 import { getActive } from '../services/membershipService.js';
 import { generateStudentIdCard } from '../services/pdfService.js';
 import { toDataURL } from '../services/qrService.js';
-import { validateCheckIn, validateCheckOut, getCurrentTime } from '../config/shiftConfig.js';
 
 export const getDashboardController = asyncHandler(async (req, res) => {
   const studentId = req.user.studentRef;
@@ -118,7 +117,7 @@ export const getAttendanceController = asyncHandler(async (req, res) => {
 });
 
 // ─── POST /student/attendance/check-in ──────────────────────────────────────
-// Student self check-in with shift validation
+// Student self check-in - NO time restrictions, pure timestamp logging
 export const selfCheckInController = asyncHandler(async (req, res) => {
   const studentId = req.user.studentRef;
   if (!studentId) throw new NotFoundError('Student account not linked.');
@@ -126,16 +125,11 @@ export const selfCheckInController = asyncHandler(async (req, res) => {
   const student = await Student.findById(studentId);
   if (!student) throw new NotFoundError('Student profile not found.');
 
-  const today   = new Date().toISOString().slice(0, 10);
-  const nowTime = getCurrentTime();
+  const today = new Date().toISOString().slice(0, 10);
   const nowTimestamp = new Date();
+  const nowTime = nowTimestamp.toTimeString().slice(0, 5);
 
-  // Shift-based validation
-  const checkInValidation = validateCheckIn(student.shift, student.customTiming);
-  if (!checkInValidation.isValid) {
-    throw new ValidationError(checkInValidation.message);
-  }
-
+  // NO shift-based validation - allow check-in at any time
   // Check for existing record today
   const existing = await Attendance.findOne({ student: studentId, date: today });
   if (existing?.checkIn) {
@@ -148,19 +142,20 @@ export const selfCheckInController = asyncHandler(async (req, res) => {
     {
       $setOnInsert: { student: studentId, date: today },
       $set: {
-        checkIn:             nowTime,
-        checkInTimestamp:    nowTimestamp, // NEW: Exact timestamp
-        checkOut:            '',
-        checkOutTimestamp:   null,
-        durationMins:        0,
-        method:              'self',
-        shift:               student.shift    || '',
-        shiftType:           student.shift, // NEW: For shift-based validation
-        seatCode:            student.seatCode || '',
-        markedBy:            null,           // self check-in, no admin
-        branch:              student.branch  || '',
-        isValidated:         true, // NEW: Validation passed
-        validationMessage:   '' // NEW: No validation error
+        checkIn: nowTime,
+        checkInTimestamp: nowTimestamp,
+        checkOut: '',
+        checkOutTimestamp: null,
+        durationMins: 0,
+        method: 'self',
+        shift: student.shift || '',
+        shiftType: student.shift,
+        seatCode: student.seatCode || '',
+        markedBy: null,
+        branch: student.branch || '',
+        isValidated: true,
+        validationMessage: '',
+        status: 'CHECKED_IN'
       }
     },
     { upsert: true, new: true }
@@ -170,7 +165,7 @@ export const selfCheckInController = asyncHandler(async (req, res) => {
 });
 
 // ─── POST /student/attendance/check-out ──────────────────────────────────────
-// Student self check-out with shift validation
+// Student self check-out - NO time restrictions, pure timestamp logging
 export const selfCheckOutController = asyncHandler(async (req, res) => {
   const studentId = req.user.studentRef;
   if (!studentId) throw new NotFoundError('Student account not linked.');
@@ -178,16 +173,11 @@ export const selfCheckOutController = asyncHandler(async (req, res) => {
   const student = await Student.findById(studentId);
   if (!student) throw new NotFoundError('Student profile not found.');
 
-  const today   = new Date().toISOString().slice(0, 10);
-  const nowTime = getCurrentTime();
+  const today = new Date().toISOString().slice(0, 10);
   const nowTimestamp = new Date();
+  const nowTime = nowTimestamp.toTimeString().slice(0, 5);
 
-  // Shift-based validation
-  const checkOutValidation = validateCheckOut(student.shift, student.customTiming);
-  if (!checkOutValidation.isValid) {
-    throw new ValidationError(checkOutValidation.message);
-  }
-
+  // NO shift-based validation - allow check-out at any time
   // Check for existing record today
   const existing = await Attendance.findOne({ student: studentId, date: today });
   if (!existing?.checkIn) {
@@ -206,11 +196,12 @@ export const selfCheckOutController = asyncHandler(async (req, res) => {
   const record = await Attendance.findByIdAndUpdate(
     existing._id,
     {
-      checkOut:            nowTime,
-      checkOutTimestamp:   nowTimestamp, // NEW: Exact timestamp
+      checkOut: nowTime,
+      checkOutTimestamp: nowTimestamp,
       durationMins,
-      isValidated:         true, // NEW: Validation passed
-      validationMessage:   '' // NEW: No validation error
+      isValidated: true,
+      validationMessage: '',
+      status: 'CHECKED_OUT'
     },
     { new: true }
   );

@@ -63,8 +63,8 @@ function TodayAttendanceCard({ todayAttendance, isLoading, student }) {
       toast.success(`✅ Attendance marked at ${record?.checkIn || timeStr}!`, { duration: 4000 });
       // Invalidate both student dashboard and admin attendance so both panels update
       qc.invalidateQueries({ queryKey: ['student', 'dashboard'] });
-      qc.invalidateQueries({ queryKey: ['admin', 'attendance']  });
-      qc.invalidateQueries({ queryKey: ['admin', 'stats']       });
+      qc.invalidateQueries({ queryKey: ['admin', 'attendance'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'stats'] });
     },
     onError: (err) => {
       toast.error(err.response?.data?.message || 'Check-in failed. Please try again.');
@@ -77,8 +77,8 @@ function TodayAttendanceCard({ todayAttendance, isLoading, student }) {
       toast.success(`✅ Check-out marked at ${record?.checkOut || timeStr}!`, { duration: 4000 });
       // Invalidate both student dashboard and admin attendance so both panels update
       qc.invalidateQueries({ queryKey: ['student', 'dashboard'] });
-      qc.invalidateQueries({ queryKey: ['admin', 'attendance']  });
-      qc.invalidateQueries({ queryKey: ['admin', 'stats']       });
+      qc.invalidateQueries({ queryKey: ['admin', 'attendance'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'stats'] });
     },
     onError: (err) => {
       toast.error(err.response?.data?.message || 'Check-out failed. Please try again.');
