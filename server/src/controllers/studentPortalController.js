@@ -127,7 +127,13 @@ export const selfCheckInController = asyncHandler(async (req, res) => {
 
   const today = new Date().toISOString().slice(0, 10);
   const nowTimestamp = new Date();
-  const nowTime = nowTimestamp.toTimeString().slice(0, 5);
+  // Format time in HH:MM format using local time (not UTC)
+  const nowTime = nowTimestamp.toLocaleTimeString('en-US', { 
+    hour12: false, 
+    hour: '2-digit', 
+    minute: '2-digit',
+    timeZone: 'Asia/Kolkata' // Explicitly use Indian timezone
+  });
 
   // NO shift-based validation - allow check-in at any time
   // Check for existing record today
@@ -175,7 +181,13 @@ export const selfCheckOutController = asyncHandler(async (req, res) => {
 
   const today = new Date().toISOString().slice(0, 10);
   const nowTimestamp = new Date();
-  const nowTime = nowTimestamp.toTimeString().slice(0, 5);
+  // Format time in HH:MM format using local time (not UTC)
+  const nowTime = nowTimestamp.toLocaleTimeString('en-US', { 
+    hour12: false, 
+    hour: '2-digit', 
+    minute: '2-digit',
+    timeZone: 'Asia/Kolkata' // Explicitly use Indian timezone
+  });
 
   // NO shift-based validation - allow check-out at any time
   // Check for existing record today

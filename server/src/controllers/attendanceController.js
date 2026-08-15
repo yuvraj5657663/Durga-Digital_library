@@ -43,7 +43,13 @@ export const markAttendanceController = asyncHandler(async (req, res) => {
 
   const attendDate = date || new Date().toISOString().slice(0, 10);
   const nowTimestamp = new Date();
-  const inTime = checkIn || nowTimestamp.toTimeString().slice(0, 5);
+  // Format time in HH:MM format using local time (not UTC)
+  const inTime = checkIn || nowTimestamp.toLocaleTimeString('en-US', { 
+    hour12: false, 
+    hour: '2-digit', 
+    minute: '2-digit',
+    timeZone: 'Asia/Kolkata' // Explicitly use Indian timezone
+  });
   const studentShift = shift || student.shift || '';
 
   // Pure timestamp logging - NO time restrictions
@@ -116,7 +122,13 @@ export const scanQrAttendanceController = asyncHandler(async (req, res) => {
   if (!student) throw new NotFoundError('Student not found');
 
   const nowTimestamp = new Date();
-  const now = nowTimestamp.toTimeString().slice(0, 5);
+  // Format time in HH:MM format using local time (not UTC)
+  const now = nowTimestamp.toLocaleTimeString('en-US', { 
+    hour12: false, 
+    hour: '2-digit', 
+    minute: '2-digit',
+    timeZone: 'Asia/Kolkata' // Explicitly use Indian timezone
+  });
   const studentShift = student.shift || '';
 
   // Toggle: if already checked in with no checkout → check out; else check in
@@ -225,7 +237,13 @@ export const checkoutAttendanceController = asyncHandler(async (req, res) => {
   }
 
   const nowTimestamp = new Date();
-  const now = nowTimestamp.toTimeString().slice(0, 5);
+  // Format time in HH:MM format using local time (not UTC)
+  const now = nowTimestamp.toLocaleTimeString('en-US', { 
+    hour12: false, 
+    hour: '2-digit', 
+    minute: '2-digit',
+    timeZone: 'Asia/Kolkata' // Explicitly use Indian timezone
+  });
 
   let attendance;
   if (attendanceId) {
