@@ -79,10 +79,10 @@ export async function setupWhatsApp() {
           '--mute-audio',
           '--no-first-run',
           '--safebrowsing-disable-auto-update',
+          '--disable-accelerated-2d-canvas',
         ],
-        // Let whatsapp-web.js use its own bundled Chromium by default.
-        // Only override executablePath if you want to use the system Chromium:
-        //   executablePath: '/usr/bin/chromium-browser',
+        // Use system Chromium on Ubuntu EC2 for better compatibility
+        executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium-browser'
       }
     });
 
