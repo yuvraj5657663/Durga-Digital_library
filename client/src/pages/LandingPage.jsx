@@ -802,7 +802,7 @@ const LandingPage = () => {
 
           <div className="border-t border-white/10 mt-12 pt-8 text-center">
             <p className="text-slate-400 text-sm">
-              &copy; 2024 Durga Digital Library. All rights reserved. Built with ❤️ for students.
+              &copy; 2026 Durga Digital Library. All rights reserved. Built with ❤️ for students.
             </p>
           </div>
         </div>
