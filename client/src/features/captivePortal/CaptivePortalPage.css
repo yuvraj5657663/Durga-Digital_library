@@ -1,0 +1,76 @@
+.captive-portal-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 20px;
+}
+
+.portal-container {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  max-width: 500px;
+  width: 100%;
+  overflow: hidden;
+}
+
+.portal-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 30px;
+  text-align: center;
+}
+
+.portal-title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.portal-subtitle {
+  margin: 10px 0 0 0;
+  font-size: 16px;
+  opacity: 0.9;
+}
+
+.portal-content {
+  padding: 30px;
+  min-height: 300px;
+}
+
+.portal-footer {
+  background: #f8f9fa;
+  padding: 20px;
+  text-align: center;
+  border-top: 1px solid #e9ecef;
+}
+
+.portal-footer p {
+  margin: 0;
+  font-size: 12px;
+  color: #6c757d;
+}
+
+@media (max-width: 600px) {
+  .captive-portal-page {
+    padding: 10px;
+  }
+
+  .portal-container {
+    border-radius: 12px;
+  }
+
+  .portal-header {
+    padding: 20px;
+  }
+
+  .portal-title {
+    font-size: 24px;
+  }
+
+  .portal-content {
+    padding: 20px;
+  }
+}

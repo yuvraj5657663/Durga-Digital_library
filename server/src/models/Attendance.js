@@ -10,7 +10,7 @@ const attendanceSchema = new mongoose.Schema(
     checkInTimestamp: { type: Date, default: null }, // NEW: Exact check-in timestamp
     checkOutTimestamp: { type: Date, default: null }, // NEW: Exact check-out timestamp
     durationMins: { type: Number, default: 0 },
-    method: { type: String, enum: ['qr_scan', 'manual', 'system'], default: 'manual' },
+    method: { type: String, enum: ['qr_scan', 'manual', 'self', 'wifi_network'], default: 'manual' },
     shift: { type: String, trim: true, default: '' },
     seatCode: { type: String, trim: true, default: '' },
     shiftType: { type: String, trim: true, default: '' }, // NEW: For shift-based validation
@@ -19,7 +19,15 @@ const attendanceSchema = new mongoose.Schema(
     notes: { type: String, trim: true, default: '' },
     branch: { type: String, trim: true, default: '' },
     isValidated: { type: Boolean, default: true }, // NEW: Whether shift validation passed
-    validationMessage: { type: String, default: '' } // NEW: Validation message if failed
+    validationMessage: { type: String, default: '' }, // NEW: Validation message if failed
+    // Wi-Fi specific fields (optional/nullable)
+    sessionReference: { type: String, trim: true, default: '' },
+    deviceReference: { type: String, trim: true, default: '' },
+    networkVerified: { type: Boolean, default: false },
+    ipAddress: { type: String, trim: true, default: '' },
+    gatewayIdentifier: { type: String, trim: true, default: '' },
+    connectionType: { type: String, trim: true, default: '' },
+    authenticationMethod: { type: String, trim: true, default: '' }
   },
   {
     timestamps: true,

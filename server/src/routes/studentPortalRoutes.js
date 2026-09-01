@@ -2,6 +2,7 @@ import express from 'express';
 import { authMiddleware, requireStudent } from '../middlewares/authMiddleware.js';
 import * as portalController from '../controllers/studentPortalController.js';
 import * as renewalController from '../controllers/renewalController.js';
+import * as deviceController from '../controllers/deviceController.js';
 
 const router = express.Router();
 
@@ -40,5 +41,9 @@ router.post('/notifications/read', portalController.markNotificationsReadControl
 
 // Announcements
 router.get('/announcements', portalController.getAnnouncementsController);
+
+// Device Management
+router.get('/devices', deviceController.getStudentDevicesController);
+router.delete('/devices/:deviceId', deviceController.revokeDeviceController);
 
 export default router;

@@ -1,9 +1,13 @@
 import nodemailer from 'nodemailer';
-import Notification from '../models/Notification.js';
 import config from '../config/index.js';
 import logger from '../config/logger.js';
 import { generateAdmissionReceipt } from './pdfService.js';
 import { hasShiftEnded, getShiftEndTime, SHIFT_CONFIG } from '../config/shiftConfig.js';
+import {
+  notificationRepository,
+  attendanceRepository,
+  studentRepository
+} from '../repositories/index.js';
 
 const transporter = nodemailer.createTransport({
   host: config.email.host,
@@ -88,7 +92,7 @@ export async function send(opts = {}) {
     studentData = null
   } = opts;
 
-  const notif = await Notification.create({
+  const notif = await notificationRepository.createNotification({
     recipient: recipient || null,
     type,
     title,
@@ -128,13 +132,13 @@ export async function send(opts = {}) {
     }
     const result = await sendEmail({ to: email, subject: title, text: body, attachments: emailAttachments });
     sentVia.email = result.sent;
-    await Notification.updateOne({ _id: notif._id }, { 'sentVia.email': result.sent });
+    await notificationRepository.updateOne({ _id: notif._id }, { 'sentVia.email': result.sent });
   }
 
   if (channel === 'whatsapp' || channel === 'all') {
     const result = await sendWhatsApp(mobile, `*${title}*\n\n${body}`);
     sentVia.whatsapp = result.sent;
-    await Notification.updateOne({ _id: notif._id }, { 'sentVia.whatsapp': result.sent });
+    await notificationRepository.updateOne({ _id: notif._id }, { 'sentVia.whatsapp': result.sent });
   }
 
   return { notification: notif, sentVia };
@@ -207,7 +211,7 @@ Aapki Fee Receipt PDF neeche attached hai. Thank you!`;
 export async function markRead(studentId, notifIds = []) {
   const filter = { recipient: studentId };
   if (notifIds.length) filter._id = { $in: notifIds };
-  const result = await Notification.updateMany(filter, { isRead: true });
+  const result = await notificationRepository.updateMany(filter, { isRead: true, readAt: new Date() });
   return result.modifiedCount;
 }
 
@@ -218,15 +222,15 @@ export async function getForStudent(studentId, { page = 1, limit = 20, unreadOnl
     ...(unreadOnly ? { isRead: false } : {})
   };
   const [notifications, total, unreadCount] = await Promise.all([
-    Notification.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
-    Notification.countDocuments(filter),
-    Notification.countDocuments({ ...filter, isRead: false })
+    notificationRepository.findByStudentId(studentId, { skip, limit, sort: { createdAt: -1 } }),
+    notificationRepository.count(filter),
+    notificationRepository.count({ ...filter, isRead: false })
   ]);
   return { notifications, total, unreadCount, page, limit };
 }
 
 export async function broadcast({ type = 'announcement', title, body, metadata = {} }) {
-  return Notification.create({ recipient: null, type, title, body, channel: 'in_app', metadata });
+  return notificationRepository.createNotification({ recipient: null, type, title, body, channel: 'in_app', metadata });
 }
 
 export async function sendShiftEndNotification({ student, attendance }) {
@@ -262,30 +266,32 @@ export async function checkAndSendShiftEndNotifications() {
   try {
     // Find students who are currently checked in (checkIn present, no checkOut)
     const today = new Date().toISOString().slice(0, 10);
-    const activeAttendances = await Attendance.find({
-      date: today,
-      checkIn: { $ne: '' },
-      checkOut: '',
-      isValidated: true
-    }).populate('student');
+    const activeAttendances = await attendanceRepository.findByDateRange(today, today);
+    
+    // Filter for active attendances (checkIn present, no checkOut, validated)
+    const filteredAttendances = activeAttendances.filter(
+      a => a.checkIn && !a.checkOut && a.isValidated
+    );
 
     const notificationsSent = [];
 
-    for (const attendance of activeAttendances) {
-      if (!attendance.student) continue;
+    for (const attendance of filteredAttendances) {
+      // Get student data separately since we can't populate in repository
+      const student = await studentRepository.findById(attendance.student);
+      if (!student) continue;
 
-      const studentShift = attendance.student.shift;
-      const customTiming = attendance.student.customTiming;
+      const studentShift = student.shift;
+      const customTiming = student.customTiming;
 
       // Check if shift has ended
       if (hasShiftEnded(studentShift)) {
         const result = await sendShiftEndNotification({
-          student: attendance.student,
+          student: student,
           attendance: attendance
         });
         notificationsSent.push({
-          studentId: attendance.student._id,
-          studentName: attendance.student.name,
+          studentId: student._id,
+          studentName: student.name,
           shift: studentShift,
           result
         });

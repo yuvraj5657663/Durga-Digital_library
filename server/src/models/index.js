@@ -11,6 +11,9 @@ import Branch from './Branch.js';
 import Inquiry from './Inquiry.js';
 import AdmissionRequest from './AdmissionRequest.js';
 import AdmissionInquiry from './AdmissionInquiry.js';
+import RegisteredDevice from './RegisteredDevice.js';
+import WiFiSession from './WiFiSession.js';
+import CaptivePortalSession from './CaptivePortalSession.js';
 
 export {
   User,
@@ -25,5 +28,8 @@ export {
   Branch,
   Inquiry,
   AdmissionRequest,
-  AdmissionInquiry
+  AdmissionInquiry,
+  RegisteredDevice,
+  WiFiSession,
+  CaptivePortalSession
 };

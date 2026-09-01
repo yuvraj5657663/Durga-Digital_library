@@ -1,12 +1,12 @@
 import mongoose from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
-import Membership from '../models/Membership.js';
-import Payment from '../models/Payment.js';
-import Student from '../models/Student.js';
 import AuditLog from '../models/AuditLog.js';
 import * as notifService from './notificationService.js';
-import studentRepository from '../repositories/StudentRepository.js';
-import membershipRepository from '../repositories/MembershipRepository.js';
+import {
+  studentRepository,
+  membershipRepository,
+  paymentRepository
+} from '../repositories/index.js';
 import logger from '../config/logger.js';
 import { toActorId } from '../utils/actorId.js';
 
@@ -45,7 +45,7 @@ export async function renew(opts) {
   if (ownSession) session.startTransaction();
 
   try {
-    const student = await Student.findById(studentId).session(session);
+    const student = await studentRepository.findById(studentId);
     if (!student) throw new Error('Student not found.');
 
     const months = parseDurationMonths(duration);
@@ -53,13 +53,13 @@ export async function renew(opts) {
     const expiryDate = addMonths(startDate, months);
     const receiptNo = existingPayment?.receiptNo || generateReceiptNo();
 
-    await Membership.updateMany(
+    await membershipRepository.updateMany(
       { student: student._id, status: 'Active' },
       { status: 'Inactive' },
       { session }
     );
 
-    const [membership] = await Membership.create([{
+    const [membership] = await membershipRepository.create([{
       student: student._id,
       type: 'Standard',
       status: 'Active',
@@ -72,7 +72,7 @@ export async function renew(opts) {
 
     // If we have an existing payment (renewal request), update it
     if (existingPayment) {
-      await Payment.findByIdAndUpdate(
+      await paymentRepository.updateById(
         existingPayment._id,
         {
           membership: membership._id,
@@ -84,7 +84,7 @@ export async function renew(opts) {
       );
     } else {
       // Create new payment record
-      const [payment] = await Payment.create([{
+      const [payment] = await paymentRepository.create([{
         student: student._id,
         membership: membership._id,
         receiptNo,
@@ -99,7 +99,7 @@ export async function renew(opts) {
       }], { session });
     }
 
-    await Student.findByIdAndUpdate(
+    await studentRepository.updateById(
       student._id,
       {
         expiryDate,
@@ -142,21 +142,21 @@ export async function renew(opts) {
 export async function expireStale() {
   const today = new Date().toISOString().slice(0, 10);
 
-  const staleMemberships = await Membership.find({
+  const staleMemberships = await membershipRepository.find({
     status: 'Active',
     expiryDate: { $lt: today }
-  }).lean();
+  });
 
   if (!staleMemberships.length) return 0;
 
   const studentIds = staleMemberships.map(m => m.student);
 
   await Promise.all([
-    Membership.updateMany(
+    membershipRepository.updateMany(
       { _id: { $in: staleMemberships.map(m => m._id) } },
       { status: 'Expired' }
     ),
-    Student.updateMany(
+    studentRepository.updateMany(
       { _id: { $in: studentIds } },
       { status: 'Expired' }
     )

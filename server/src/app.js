@@ -16,6 +16,7 @@ import studentPortalRoutes from './routes/studentPortalRoutes.js';
 import admissionRoutes from './routes/admissionRoutes.js';
 import inquiryRoutes from './routes/inquiryRoutes.js';
 import admissionInquiryRoutes from './routes/admissionInquiryRoutes.js';
+import networkRoutes from './routes/networkRoutes.js';
 
 const app = express();
 
@@ -156,6 +157,7 @@ app.use('/api/v1/student', studentPortalRoutes);
 app.use('/api/v1/online-admissions', admissionRoutes);
 app.use('/api/v1/inquiries', inquiryRoutes);
 app.use('/api/v1/admission', admissionInquiryRoutes);
+app.use('/api/v1/network', networkRoutes);
 
 // 404 — JSON response for unmatched /api/* paths only
 // Non-API paths (e.g. /student, /admin) are React Router client-side routes —

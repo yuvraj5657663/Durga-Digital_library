@@ -1,9 +1,8 @@
 import mongoose from 'mongoose';
-import config from '../../src/config/index.js';
 
 export async function setupTestDB() {
-  // Use test database
-  const testDbUri = config.database.uri.replace(/\/[^/]*$/, '/durga-library-test');
+  // Use TEST_MONGODB_URI in test environment, fallback to local MongoDB
+  const testDbUri = process.env.TEST_MONGODB_URI || 'mongodb://localhost:27017/durga-library-test';
   await mongoose.connect(testDbUri);
 }
 

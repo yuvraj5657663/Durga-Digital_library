@@ -9,6 +9,9 @@ import * as announcementController from '../controllers/announcementController.j
 import * as admissionController  from '../controllers/admissionRequestController.js';
 import * as renewalController   from '../controllers/renewalController.js';
 import * as notificationController from '../controllers/notificationController.js';
+import * as deviceController from '../controllers/deviceController.js';
+import * as wifiSessionController from '../controllers/wifiSessionController.js';
+import * as captivePortalController from '../controllers/captivePortalController.js';
 import { SHIFT_CONFIG } from '../config/shiftConfig.js';
 import Seat from '../models/Seat.js';
 
@@ -134,5 +137,27 @@ router.get('/notifications',              notificationController.getNotification
 router.post('/notifications/test',        notificationController.createTestNotificationController);
 router.patch('/notifications/read-all',  notificationController.markAllAsReadController);
 router.patch('/notifications/:id/read',  notificationController.markAsReadController);
+
+// ── Device Management ─────────────────────────────────────────────────────────────
+router.get('/devices',                    deviceController.getAllDevicesController);
+router.get('/devices/:deviceId',          deviceController.getDeviceController);
+router.post('/devices/:deviceId/suspend', deviceController.suspendDeviceController);
+router.post('/devices/:deviceId/restore', deviceController.restoreDeviceController);
+
+// ── Wi-Fi Session Management ─────────────────────────────────────────────────────
+router.get('/wifi/sessions',                    wifiSessionController.getAllSessionsController);
+router.get('/wifi/sessions/:sessionId',          wifiSessionController.getSessionController);
+router.post('/wifi/sessions/:sessionId/revoke', wifiSessionController.revokeSessionController);
+router.post('/wifi/students/:studentId/sessions/revoke', wifiSessionController.revokeStudentSessionsController);
+
+// ── Captive Portal Management ─────────────────────────────────────────────────────
+router.get('/network/portal/sessions',                    captivePortalController.getAllPortalSessionsController);
+router.get('/network/portal/sessions/:portalSessionId',  captivePortalController.getPortalSessionController);
+router.post('/network/portal/sessions/:portalSessionId/expire', captivePortalController.expirePortalSessionController);
+
+// ── Gateway Diagnostics ─────────────────────────────────────────────────────────────
+router.get('/network/gateway/status', captivePortalController.gatewayDiagnosticsController);
+router.get('/network/gateway/readiness', captivePortalController.gatewayReadinessController);
+router.get('/network/gateway/health', captivePortalController.gatewayHealthController);
 
 export default router;

@@ -68,6 +68,37 @@ export const config = {
     name: process.env.APP_NAME || 'Durga Digital Library',
     url: process.env.APP_URL || 'http://localhost:3000',
   },
+
+  wifi: {
+    maxDevicesPerStudent: parseInt(process.env.MAX_WIFI_DEVICES_PER_STUDENT, 10) || 2,
+    sessionDurationMinutes: parseInt(process.env.WIFI_SESSION_DURATION_MINUTES, 10) || 720,
+  },
+
+  network: {
+    portalSessionDurationMinutes: parseInt(process.env.NETWORK_PORTAL_SESSION_DURATION_MINUTES, 10) || 10,
+    gateway: {
+      mode: process.env.NETWORK_GATEWAY_MODE || 'development',
+      provider: process.env.NETWORK_GATEWAY_PROVIDER || 'development',
+      defaultGatewayId: process.env.NETWORK_GATEWAY_ID || null,
+      // MikroTik configuration
+      host: process.env.NETWORK_GATEWAY_HOST || null,
+      port: parseInt(process.env.NETWORK_GATEWAY_PORT, 10) || null,
+      username: process.env.NETWORK_GATEWAY_USERNAME || null,
+      password: process.env.NETWORK_GATEWAY_PASSWORD || null,
+      // PfSense/Ubiquiti configuration
+      apiUrl: process.env.NETWORK_GATEWAY_API_URL || null,
+      apiUsername: process.env.NETWORK_GATEWAY_API_USERNAME || null,
+      apiPassword: process.env.NETWORK_GATEWAY_API_PASSWORD || null
+    },
+    router: {
+      vendor: process.env.NETWORK_ROUTER_VENDOR || null,
+      model: process.env.NETWORK_ROUTER_MODEL || null,
+      firmware: process.env.NETWORK_ROUTER_FIRMWARE || null,
+      radiusHost: process.env.NETWORK_GATEWAY_RADIUS_HOST || null,
+      radiusPort: process.env.NETWORK_GATEWAY_RADIUS_PORT || null,
+      radiusSecret: process.env.NETWORK_GATEWAY_RADIUS_SECRET || null
+    }
+  },
 };
 
 export default config;

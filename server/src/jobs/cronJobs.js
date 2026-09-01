@@ -1,6 +1,7 @@
 import cron from 'node-cron';
 import { expireStale, findExpiringSoon } from '../services/membershipService.js';
 import { sendRenewalReminder, checkAndSendShiftEndNotifications } from '../services/notificationService.js';
+import { expireOldSessions } from '../services/wifiSessionService.js';
 import logger from '../config/logger.js';
 
 export function startCronJobs() {
@@ -80,6 +81,17 @@ export function startCronJobs() {
       logger.info(`Night Shift end notifications sent: ${notifications.length}`);
     } catch (error) {
       logger.error('Night Shift end notification job failed:', error);
+    }
+  });
+
+  // Wi-Fi session expiration - run every hour
+  cron.schedule('0 * * * *', async () => {
+    try {
+      logger.info('Running Wi-Fi session expiration check...');
+      const result = await expireOldSessions();
+      logger.info(`Wi-Fi session expiration check completed: ${result.expiredCount} sessions expired`);
+    } catch (error) {
+      logger.error('Wi-Fi session expiration job failed:', error);
     }
   });
 
