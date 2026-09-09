@@ -30,6 +30,8 @@
 //   ✅  import pkg from 'whatsapp-web.js'; const { Client, LocalAuth } = pkg;
 import pkg from 'whatsapp-web.js';
 const { Client, LocalAuth } = pkg;
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 // qrcode-terminal is also CJS — same pattern applies
 import qrcodeTerminal from 'qrcode-terminal';
@@ -39,6 +41,10 @@ import logger from '../config/logger.js';
 
 let whatsappClient = null;
 let isWaReady      = false;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const whatsappAuthPath = process.env.WHATSAPP_AUTH_PATH
+  || path.resolve(__dirname, '../../../.wwebjs_auth');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Main setup function — called from index.js AFTER app.listen() succeeds.
@@ -57,7 +63,7 @@ export async function setupWhatsApp() {
     // ── FIX: LocalAuth must be instantiated with `new`, not passed as a plain object ──
     whatsappClient = new Client({
       authStrategy: new LocalAuth({
-        dataPath: './.wwebjs_auth'   // persists session across restarts
+        dataPath: whatsappAuthPath   // explicit persistent path, independent of PM2 cwd
       }),
       puppeteer: {
         headless: true,
@@ -86,7 +92,7 @@ export async function setupWhatsApp() {
       }
     });
 
-    logger.info('[WA Step 2] Attaching event listeners…');
+    logger.info(`[WA Step 2] Attaching event listeners; auth path: ${whatsappAuthPath}`);
     console.log('[WA Step 2] Attaching event listeners…');
 
     // ── QR code: displayed in terminal so admin can scan from their phone ──
