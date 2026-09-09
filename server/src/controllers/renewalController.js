@@ -213,7 +213,8 @@ export const approveRenewalRequestController = asyncHandler(async (req, res) => 
       fee: renewalRequest.amount,
       paymentMode: renewalRequest.mode,
       adminUser,
-      session
+      session,
+      existingPayment: renewalRequest
     });
 
     // Update payment with membership details

@@ -6,13 +6,15 @@ import userRepository from '../repositories/UserRepository.js';
 import config from '../config/index.js';
 import logger from '../config/logger.js';
 import { AuthenticationError } from '../utils/errors.js';
+import { permissionsForRole } from '../config/accessControl.js';
 
 function getEnvAdminUser() {
   return {
     _id: 'env-admin',
     id: 'env-admin',
     name: 'Admin',
-    role: 'admin',
+    role: 'SUPER_ADMIN',
+    permissions: ['*'],
     username: config.admin.user,
     email: config.admin.email
   };
@@ -25,6 +27,7 @@ function signAccessToken(user) {
       role:       user.role,
       email:      user.email,
       username:   user.username,
+      permissions: user.permissions || permissionsForRole(user.role),
       // studentRef lets requireStudent middleware resolve the student document
       studentRef: user.studentRef ? user.studentRef.toString() : undefined
     },
@@ -40,6 +43,7 @@ function signRefreshToken(user) {
       role:       user.role,
       email:      user.email,
       username:   user.username,
+      permissions: user.permissions || permissionsForRole(user.role),
       studentRef: user.studentRef ? user.studentRef.toString() : undefined
     },
     config.jwt.secret,
@@ -113,6 +117,7 @@ export async function login(username, password, ip, userAgent) {
         username:   user.username,
         email:      user.email,
         studentRef: user.studentRef ? user.studentRef.toString() : undefined,
+        permissions: user.permissions || permissionsForRole(user.role),
         name:       user.name || user.username
       }
     };

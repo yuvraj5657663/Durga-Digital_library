@@ -1,0 +1,81 @@
+export const STAFF_ROLES = [
+  'SUPER_ADMIN',
+  'ADMIN',
+  'MANAGER',
+  'STAFF',
+  'ACCOUNTANT',
+  'LIBRARIAN',
+  'SUPPORT',
+  'admin'
+];
+
+export const ROLE_PERMISSIONS = {
+  SUPER_ADMIN: ['*'],
+  ADMIN: [
+    'ADMIN_MANAGE',
+    'STUDENT_VIEW', 'STUDENT_CREATE', 'STUDENT_UPDATE',
+    'ADMISSION_VIEW', 'ADMISSION_CREATE', 'ADMISSION_APPROVE', 'ADMISSION_REJECT',
+    'MEMBERSHIP_VIEW', 'MEMBERSHIP_CREATE', 'MEMBERSHIP_UPDATE',
+    'PAYMENT_VIEW', 'PAYMENT_CREATE', 'PAYMENT_UPDATE', 'PAYMENT_REFUND',
+    'ATTENDANCE_VIEW', 'ATTENDANCE_CREATE', 'ATTENDANCE_UPDATE',
+    'WIFI_VIEW', 'WIFI_MANAGE',
+    'NOTIFICATION_VIEW', 'NOTIFICATION_SEND', 'NOTIFICATION_RETRY',
+    'REPORT_VIEW', 'REPORT_EXPORT', 'SETTINGS_MANAGE'
+  ],
+  MANAGER: [
+    'STUDENT_VIEW', 'STUDENT_CREATE', 'STUDENT_UPDATE',
+    'ADMISSION_VIEW', 'ADMISSION_CREATE', 'ADMISSION_APPROVE', 'ADMISSION_REJECT',
+    'MEMBERSHIP_VIEW', 'MEMBERSHIP_CREATE', 'MEMBERSHIP_UPDATE',
+    'PAYMENT_VIEW', 'PAYMENT_CREATE', 'PAYMENT_UPDATE',
+    'ATTENDANCE_VIEW', 'ATTENDANCE_CREATE', 'ATTENDANCE_UPDATE',
+    'WIFI_VIEW', 'WIFI_MANAGE',
+    'NOTIFICATION_VIEW', 'NOTIFICATION_SEND', 'NOTIFICATION_RETRY',
+    'REPORT_VIEW'
+  ],
+  STAFF: [
+    'STUDENT_VIEW', 'STUDENT_CREATE', 'STUDENT_UPDATE',
+    'ADMISSION_VIEW', 'ADMISSION_CREATE',
+    'MEMBERSHIP_VIEW',
+    'ATTENDANCE_VIEW', 'ATTENDANCE_CREATE', 'ATTENDANCE_UPDATE',
+    'NOTIFICATION_VIEW', 'NOTIFICATION_SEND', 'NOTIFICATION_RETRY',
+    'REPORT_VIEW'
+  ],
+  ACCOUNTANT: [
+    'STUDENT_VIEW', 'ADMISSION_VIEW', 'MEMBERSHIP_VIEW',
+    'PAYMENT_VIEW', 'PAYMENT_CREATE', 'PAYMENT_UPDATE', 'PAYMENT_REFUND',
+    'REPORT_VIEW', 'REPORT_EXPORT'
+  ],
+  LIBRARIAN: [
+    'STUDENT_VIEW', 'STUDENT_UPDATE',
+    'ADMISSION_VIEW', 'MEMBERSHIP_VIEW', 'MEMBERSHIP_CREATE',
+    'ATTENDANCE_VIEW', 'ATTENDANCE_CREATE', 'ATTENDANCE_UPDATE',
+    'WIFI_VIEW', 'WIFI_MANAGE',
+    'NOTIFICATION_VIEW', 'NOTIFICATION_SEND',
+    'REPORT_VIEW'
+  ],
+  SUPPORT: [
+    'STUDENT_VIEW', 'ADMISSION_VIEW', 'MEMBERSHIP_VIEW',
+    'PAYMENT_VIEW', 'PAYMENT_UPDATE', 'ATTENDANCE_VIEW', 'WIFI_VIEW',
+    'NOTIFICATION_VIEW', 'NOTIFICATION_RETRY',
+    'REPORT_VIEW'
+  ],
+  admin: ['*'],
+  student: []
+};
+
+export const normalizeRole = (role) => {
+  if (role === 'admin') return 'admin';
+  return String(role || '').toUpperCase();
+};
+
+export const permissionsForRole = (role) => ROLE_PERMISSIONS[normalizeRole(role)] || [];
+
+export const roleHasPermission = (role, permission, explicitPermissions = []) => {
+  const permissions = new Set([
+    ...permissionsForRole(role),
+    ...(Array.isArray(explicitPermissions) ? explicitPermissions : [])
+  ]);
+  return permissions.has('*') || permissions.has(permission);
+};
+
+export const roleIsStaff = (role) => STAFF_ROLES.includes(role) || STAFF_ROLES.includes(normalizeRole(role));

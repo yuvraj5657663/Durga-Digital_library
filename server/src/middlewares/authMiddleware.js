@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import config from '../config/index.js';
 import { AuthenticationError, AuthorizationError } from '../utils/errors.js';
 import userRepository from '../repositories/UserRepository.js';
+import { roleHasPermission, roleIsStaff, permissionsForRole } from '../config/accessControl.js';
 
 export const authMiddleware = async (req, res, next) => {
   try {
@@ -21,7 +22,8 @@ export const authMiddleware = async (req, res, next) => {
         req.user = {
           id:       'env-admin',   // display / audit string only
           userId:   null,           // null = not a real DB user, safe for ObjectId fields
-          role:     'admin',
+          role:     'SUPER_ADMIN',
+          permissions: ['*'],
           username: config.admin.user,
           email:    config.admin.email
         };
@@ -39,6 +41,7 @@ export const authMiddleware = async (req, res, next) => {
         id:         user._id.toString(), // always a valid ObjectId string
         userId:     user._id.toString(), // alias — use this for ObjectId fields
         role:       user.role,
+        permissions: user.permissions || permissionsForRole(user.role),
         username:   user.username,
         email:      user.email,
         studentRef: user.studentRef ? user.studentRef.toString() : decoded.studentRef
@@ -60,8 +63,8 @@ export const authMiddleware = async (req, res, next) => {
 };
 
 export const requireAdmin = (req, res, next) => {
-  if (req.user?.role !== 'admin') {
-    return next(new AuthorizationError('Admin access required'));
+  if (!roleIsStaff(req.user?.role)) {
+    return next(new AuthorizationError('Staff access required'));
   }
   next();
 };
@@ -80,4 +83,23 @@ export const requireRole = (...roles) => {
     }
     next();
   };
+};
+
+export const hasPermission = (user, permission) => {
+  return roleHasPermission(user?.role, permission, user?.permissions);
+};
+
+export const requirePermission = (permission) => (req, res, next) => {
+  if (!hasPermission(req.user, permission)) {
+    return next(new AuthorizationError(`Permission required: ${permission}`));
+  }
+  next();
+};
+
+export const requireAllPermissions = (...permissions) => (req, res, next) => {
+  const missing = permissions.filter(permission => !hasPermission(req.user, permission));
+  if (missing.length) {
+    return next(new AuthorizationError(`Permissions required: ${missing.join(', ')}`));
+  }
+  next();
 };

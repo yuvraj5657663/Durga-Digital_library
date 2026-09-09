@@ -4,10 +4,11 @@ import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import {
   Search, Plus, Pencil, Trash2, RefreshCw, X, Loader2,
-  ChevronLeft, ChevronRight, CreditCard
+  ChevronLeft, ChevronRight, CreditCard, Bell
 } from 'lucide-react';
 import { studentService }    from '../../services/studentService';
 import { membershipService } from '../../services/membershipService';
+import { notificationService } from '../../services/notificationService';
 import AddStudentModal        from './components/AddStudentModal';
 
 /* ─── helpers ─────────────────────────────────────────────────────────────── */
@@ -115,7 +116,7 @@ function RenewMembershipModal({ student, onClose, onSuccess }) {
       studentId:   student._id || student.id,
       duration:    '1 Month(s)',
       fee:         500,
-      paymentMode: 'Cash',
+      paymentMode: 'cash',
       joiningDate: today,
       expiryDate:  '',
     },
@@ -181,8 +182,13 @@ function RenewMembershipModal({ student, onClose, onSuccess }) {
             <div className="col-span-2">
               <label className="label">Payment Mode</label>
               <select {...register('paymentMode')} className="input">
-                {['Cash', 'UPI', 'Bank Transfer', 'Cheque'].map((m) => (
-                  <option key={m} value={m}>{m}</option>
+                {[
+                  ['cash', 'Cash'],
+                  ['upi', 'UPI'],
+                  ['bank_transfer', 'Bank Transfer'],
+                  ['cheque', 'Cheque']
+                ].map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
                 ))}
               </select>
             </div>
@@ -217,6 +223,9 @@ export default function StudentsPage() {
   const [search,       setSearch]    = useState('');
   const [statusFilter, setStatus]    = useState('');
   const [shiftFilter,  setShift]     = useState('');
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [reminderType, setReminderType] = useState('expiring_soon');
+  const [customMessage, setCustomMessage] = useState('');
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin', 'students', page, search, statusFilter, shiftFilter],
@@ -243,6 +252,22 @@ export default function StudentsPage() {
     if (!window.confirm(`Deactivate ${s.name}? Their seat will be freed.`)) return;
     deactivateMutation.mutate(s._id || s.id);
   };
+
+  const reminderMutation = useMutation({
+    mutationFn: (studentIds) => notificationService.sendReminder({
+      studentIds, type: reminderType, customMessage, channel: 'all'
+    }),
+    onSuccess: (result) => {
+      toast.success(`${result.count} reminder${result.count === 1 ? '' : 's'} queued`);
+      setSelectedIds([]);
+      setCustomMessage('');
+    },
+    onError: (e) => toast.error(e.response?.data?.message || 'Failed to send reminder'),
+  });
+
+  const toggleSelected = (id) => setSelectedIds((current) =>
+    current.includes(id) ? current.filter((value) => value !== id) : [...current, id]
+  );
 
   return (
     <div className="space-y-5">
@@ -286,6 +311,23 @@ export default function StudentsPage() {
         >
           <RefreshCw className="w-4 h-4" />
         </button>
+        <select className="input w-44 text-sm" value={reminderType} onChange={(e) => setReminderType(e.target.value)}>
+          <option value="payment_due">Payment / renewal due</option>
+          <option value="expiring_soon">Expiring soon</option>
+          <option value="expired">Membership expired</option>
+          <option value="custom">Custom reminder</option>
+        </select>
+        {reminderType === 'custom' && (
+          <input className="input min-w-[220px] text-sm" value={customMessage} onChange={(e) => setCustomMessage(e.target.value)} placeholder="Custom reminder message" />
+        )}
+        <button
+          onClick={() => reminderMutation.mutate(selectedIds)}
+          disabled={!selectedIds.length || reminderMutation.isPending || (reminderType === 'custom' && !customMessage.trim())}
+          className="btn btn-secondary flex items-center gap-2 disabled:opacity-40"
+          title="Send reminder to selected students"
+        >
+          <Bell className="w-4 h-4" /> Send ({selectedIds.length})
+        </button>
       </div>
 
       {/* Table */}
@@ -294,7 +336,7 @@ export default function StudentsPage() {
           <table className="min-w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                {['Student ID', 'Name', 'Mobile', 'Seat', 'Shift', 'Status', 'Expiry', 'Actions'].map((h) => (
+                {['', 'Student ID', 'Name', 'Mobile', 'Seat', 'Shift', 'Status', 'Expiry', 'Actions'].map((h) => (
                   <th
                     key={h}
                     className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap"
@@ -308,7 +350,7 @@ export default function StudentsPage() {
               {isLoading
                 ? Array.from({ length: 6 }).map((_, i) => (
                     <tr key={i}>
-                      {Array.from({ length: 8 }).map((_, j) => (
+                      {Array.from({ length: 9 }).map((_, j) => (
                         <td key={j} className="px-4 py-3">
                           <div className="animate-pulse bg-gray-200 h-4 rounded w-20" />
                         </td>
@@ -318,13 +360,16 @@ export default function StudentsPage() {
                 : students.length === 0
                   ? (
                       <tr>
-                        <td colSpan={8} className="px-4 py-12 text-center text-gray-400">
+                        <td colSpan={9} className="px-4 py-12 text-center text-gray-400">
                           No students found
                         </td>
                       </tr>
                     )
                   : students.map((s) => (
                       <tr key={s._id || s.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-4 py-3">
+                          <input type="checkbox" checked={selectedIds.includes(s._id || s.id)} onChange={() => toggleSelected(s._id || s.id)} aria-label={`Select ${s.name}`} />
+                        </td>
                         <td className="px-4 py-3 font-mono text-xs text-gray-500">{s.studentId || '—'}</td>
                         <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">{s.name}</td>
                         <td className="px-4 py-3 text-gray-600">{s.mobile}</td>
@@ -334,6 +379,14 @@ export default function StudentsPage() {
                         <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{s.expiryDate || '—'}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={() => reminderMutation.mutate([s._id || s.id])}
+                              disabled={reminderMutation.isPending}
+                              className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded disabled:opacity-40"
+                              title="Send reminder"
+                            >
+                              <Bell className="w-4 h-4" />
+                            </button>
                             <button
                               onClick={() => { setSelected(s); setEditOpen(true); }}
                               className="p-1.5 text-gray-400 hover:text-library-blue hover:bg-blue-50 rounded"

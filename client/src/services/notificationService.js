@@ -45,4 +45,14 @@ export const notificationService = {
       throw error;
     }
   },
+
+  sendReminder: async (data) => {
+    const response = await api.post('/admin/notifications/reminders', data);
+    return response.data.data || response.data;
+  },
+
+  retry: async (id, channels) => {
+    const response = await api.post(`/admin/notifications/${id}/retry`, { channels });
+    return response.data.data || response.data;
+  },
 };

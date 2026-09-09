@@ -9,11 +9,13 @@ import {
 import {
   Users, UserCheck, UserX, Clock, Plus, TrendingUp,
   AlertTriangle, Armchair, FileText, IndianRupee
+  ,Wifi, Bell
 } from 'lucide-react';
 import { studentService } from '../../services/studentService';
 import AddStudentModal from './components/AddStudentModal';
 import SeatMatrixGrid from '../../components/admin/SeatMatrixGrid';
 import RenewalRequestsPanel from '../../components/admin/RenewalRequestsPanel';
+import AdminAnalyticsAssistant from '../../components/admin/AdminAnalyticsAssistant';
 
 // ── Skeleton ──────────────────────────────────────────────────────────────────
 const Skeleton = ({ className = '' }) => (
@@ -45,7 +47,7 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const { data: stats, isLoading } = useQuery({
+  const { data: stats, isLoading, isError } = useQuery({
     queryKey: ['admin', 'stats'],
     queryFn: () => studentService.getDashboardStats(),
     refetchInterval: 60_000,
@@ -64,6 +66,8 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-6">
+      <AdminAnalyticsAssistant />
+      {isError && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">Dashboard data could not be loaded. Refresh to try again.</div>}
       {/* Seat Matrix Grid - Replaces white space */}
       <SeatMatrixGrid 
         onSeatClick={handleSeatClick}
@@ -84,6 +88,13 @@ export default function AdminDashboard() {
         <StatCard label="Seats Occupied"      value={stats?.seatsOccupied}   icon={Armchair}      color="bg-indigo-500"    loading={isLoading} />
         <StatCard label="Pending Admissions"  value={stats?.pendingAdmissions} icon={FileText}    color="bg-orange-500"    loading={isLoading}
           sub={stats?.pendingAdmissions > 0 ? 'needs review' : undefined} />
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard label="Today's Revenue" value={stats ? `₹${(stats.todayRevenue || 0).toLocaleString('en-IN')}` : '—'} icon={IndianRupee} color="bg-teal-600" loading={isLoading} />
+        <StatCard label="Today's Admissions" value={stats?.todayAdmissions} icon={FileText} color="bg-cyan-600" loading={isLoading} />
+        <StatCard label="WiFi Connected Now" value={stats?.wifiConnectedNow} icon={Wifi} color="bg-green-600" loading={isLoading} />
+        <StatCard label="Pending Notifications" value={stats?.pendingNotifications} icon={Bell} color="bg-pink-600" loading={isLoading} />
       </div>
 
       {/* Charts row */}

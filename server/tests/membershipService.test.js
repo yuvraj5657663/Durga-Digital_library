@@ -4,6 +4,9 @@ jest.mock('../src/config/logger.js');
 jest.mock('../src/services/notificationService.js', () => ({
   sendMembershipActivated: jest.fn().mockResolvedValue({})
 }));
+jest.mock('../src/services/paymentService.js', () => ({
+  createPayment: jest.fn().mockResolvedValue({ _id: 'payment123', receiptNo: 'DDL-20250101-AAAAAA' })
+}));
 jest.mock('../src/utils/actorId.js', () => ({
   toActorId: jest.fn((id) => id)
 }));
@@ -54,15 +57,15 @@ describe('Membership Service', () => {
     name: 'John Doe',
     studentId: 'DDL001',
     branch: 'Main',
-    expiryDate: '2025-12-31'
+    expiryDate: '2099-12-31'
   };
 
   const mockMembership = {
     _id: 'membership123',
     student: 'student123',
     status: 'Active',
-    startDate: '2025-01-01',
-    expiryDate: '2025-12-31',
+    startDate: '2098-12-31',
+    expiryDate: '2099-12-31',
     fee: 500,
     duration: '12 Month(s)'
   };
@@ -77,24 +80,113 @@ describe('Membership Service', () => {
       studentRepository.findById.mockResolvedValue(mockStudent);
       studentRepository.updateById.mockResolvedValue(mockStudent);
       membershipRepository.updateMany.mockResolvedValue({ modifiedCount: 0 });
-      membershipRepository.create.mockResolvedValue([mockMembership]);
-      paymentRepository.create.mockResolvedValue([{ _id: 'payment123', receiptNo: 'DDL-20250101-AAAAAA' }]);
+      membershipRepository.findActiveByStudent.mockResolvedValue(mockMembership);
+      membershipRepository.create.mockImplementation(async ([membership]) => [{
+        ...membership,
+        _id: 'membership123'
+      }]);
       AuditLog.create.mockResolvedValue([{}]);
     });
 
-    it('should renew membership for active student', async () => {
+    it('extends an active membership from its current expiry date', async () => {
       const result = await renew({
         studentId: 'student123',
         duration: '1 Month(s)',
         fee: 500,
         paymentMode: 'cash',
-        joiningDate: '2025-01-01',
+        joiningDate: '2030-01-01',
         adminUser: { _id: 'admin1', id: 'admin1', role: 'admin', name: 'Admin' }
       });
 
       expect(result).toHaveProperty('membership');
       expect(result).toHaveProperty('receiptNo');
-      expect(result).toHaveProperty('expiryDate');
+      expect(result.membership.startDate).toBe('2099-12-31');
+      expect(result.expiryDate).toBe('2100-01-31');
+    });
+
+    it('starts from today when the active membership is expired', async () => {
+      const { membershipRepository } = await import('../src/repositories/index.js');
+      const expiredDate = new Date();
+      expiredDate.setDate(expiredDate.getDate() - 1);
+      membershipRepository.findActiveByStudent.mockResolvedValue({
+        ...mockMembership,
+        expiryDate: expiredDate.toISOString().slice(0, 10)
+      });
+
+      const result = await renew({
+        studentId: 'student123',
+        duration: '1 Month(s)',
+        fee: 500,
+        paymentMode: 'cash'
+      });
+
+      const today = new Date().toISOString().slice(0, 10);
+      const expectedExpiry = new Date(today);
+      expectedExpiry.setMonth(expectedExpiry.getMonth() + 1);
+      expect(result.membership.startDate).toBe(today);
+      expect(result.expiryDate).toBe(expectedExpiry.toISOString().slice(0, 10));
+    });
+
+    it('extends from today when an active membership expires today', async () => {
+      const { membershipRepository } = await import('../src/repositories/index.js');
+      const today = new Date().toISOString().slice(0, 10);
+      membershipRepository.findActiveByStudent.mockResolvedValue({
+        ...mockMembership,
+        expiryDate: today
+      });
+
+      const result = await renew({
+        studentId: 'student123',
+        duration: '1 Month(s)',
+        fee: 500,
+        paymentMode: 'cash'
+      });
+
+      const expectedExpiry = new Date(today);
+      expectedExpiry.setMonth(expectedExpiry.getMonth() + 1);
+      expect(result.membership.startDate).toBe(today);
+      expect(result.expiryDate).toBe(expectedExpiry.toISOString().slice(0, 10));
+    });
+
+    it('creates a new payment record for a direct cash renewal', async () => {
+      const { paymentRepository } = await import('../src/repositories/index.js');
+
+      await renew({
+        studentId: 'student123',
+        duration: '1 Month(s)',
+        fee: 500,
+        paymentMode: 'cash'
+      });
+
+      const { createPayment } = await import('../src/services/paymentService.js');
+      expect(createPayment).toHaveBeenCalledWith(expect.objectContaining({
+          student: 'student123',
+          amount: 500,
+          method: 'CASH',
+          type: 'renewal',
+          status: 'PAID'
+        }));
+      expect(paymentRepository.updateById).not.toHaveBeenCalled();
+    });
+
+    it('completes a student renewal payment without creating a duplicate', async () => {
+      const { paymentRepository } = await import('../src/repositories/index.js');
+      const existingPayment = { _id: 'pending-payment', receiptNo: 'DDL-REQUEST' };
+
+      await renew({
+        studentId: 'student123',
+        duration: '1 Month(s)',
+        fee: 500,
+        paymentMode: 'upi',
+        existingPayment
+      });
+
+      expect(paymentRepository.updateById).toHaveBeenCalledWith(
+        'pending-payment',
+        expect.objectContaining({ status: 'PAID' }),
+        expect.objectContaining({ session: expect.anything() })
+      );
+      expect(paymentRepository.create).not.toHaveBeenCalled();
     });
 
     it('should throw error if student not found', async () => {
@@ -115,12 +207,8 @@ describe('Membership Service', () => {
         fee: 1500
       });
 
-      // 3 months added to today
-      const now = new Date();
-      now.setMonth(now.getMonth() + 3);
-      const expectedYear = now.getFullYear();
-
-      expect(result.expiryDate).toContain(String(expectedYear));
+      expect(result.membership.startDate).toBe('2099-12-31');
+      expect(result.expiryDate).toBe('2100-03-31');
     });
 
     it('should generate receipt number', async () => {

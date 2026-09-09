@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
 import AuditLog from '../models/AuditLog.js';
 import * as notifService from './notificationService.js';
+import { createPayment } from './paymentService.js';
 import {
   studentRepository,
   membershipRepository,
@@ -21,6 +22,10 @@ function addMonths(dateStr, n) {
   const d = new Date(dateStr);
   d.setMonth(d.getMonth() + n);
   return d.toISOString().slice(0, 10);
+}
+
+function todayDate() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 function parseDurationMonths(durationStr) {
@@ -49,7 +54,10 @@ export async function renew(opts) {
     if (!student) throw new Error('Student not found.');
 
     const months = parseDurationMonths(duration);
-    const startDate = joiningDate || new Date().toISOString().slice(0, 10);
+    const today = todayDate();
+    const activeMembership = await membershipRepository.findActiveByStudent(student._id);
+    const activeExpiry = activeMembership?.expiryDate;
+    const startDate = activeExpiry && activeExpiry >= today ? activeExpiry : today;
     const expiryDate = addMonths(startDate, months);
     const receiptNo = existingPayment?.receiptNo || generateReceiptNo();
 
@@ -76,7 +84,7 @@ export async function renew(opts) {
         existingPayment._id,
         {
           membership: membership._id,
-          status: 'completed',
+          status: 'PAID',
           paidOn: startDate,
           collectedBy: toActorId(adminUser?._id || adminUser?.id)
         },
@@ -84,19 +92,20 @@ export async function renew(opts) {
       );
     } else {
       // Create new payment record
-      const [payment] = await paymentRepository.create([{
+      await createPayment({
         student: student._id,
         membership: membership._id,
         receiptNo,
         type: 'renewal',
         amount: parseFloat(fee),
-        mode: paymentMode,
-        status: 'completed',
-        transactionId,
+        method: paymentMode === 'cash' ? 'CASH' : 'ONLINE',
+        status: 'PAID',
+        reference: transactionId,
         paidOn: startDate,
-        collectedBy: toActorId(adminUser?._id || adminUser?.id),
-        branch: student.branch || ''
-      }], { session });
+        plan: duration,
+        collectedBy: adminUser?._id || adminUser?.id,
+        session
+      });
     }
 
     await studentRepository.updateById(

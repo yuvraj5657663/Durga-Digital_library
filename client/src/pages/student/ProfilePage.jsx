@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
-import { User, Download, Loader2, CheckCircle, Clock, Armchair } from 'lucide-react';
+import { User, Download, Loader2, CheckCircle, Clock, Armchair, KeyRound } from 'lucide-react';
+import api from '../../services/api';
 import { portalService } from '../../services/portalService';
 import { format, differenceInDays, parseISO } from 'date-fns';
 
@@ -23,6 +24,7 @@ function CountdownBadge({ expiryDate }) {
 export default function ProfilePage() {
   const qc = useQueryClient();
   const [editing, setEditing] = useState(false);
+  const [passwords, setPasswords] = useState({ currentPassword: '', newPassword: '' });
 
   const { data: profile, isLoading } = useQuery({
     queryKey: ['student', 'profile'],
@@ -42,6 +44,15 @@ export default function ProfilePage() {
       setEditing(false);
     },
     onError: (e) => toast.error(e.response?.data?.message || 'Update failed'),
+  });
+
+  const passwordMutation = useMutation({
+    mutationFn: async (data) => (await api.post('/auth/change-password', data)).data.data,
+    onSuccess: () => {
+      toast.success('Password changed successfully');
+      setPasswords({ currentPassword: '', newPassword: '' });
+    },
+    onError: (error) => toast.error(error.response?.data?.message || 'Unable to change password'),
   });
 
   const downloadIdCard = async () => {
@@ -158,6 +169,7 @@ export default function ProfilePage() {
           <div className="space-y-3 text-sm">
             {[
               ['Name',        profile?.name],
+              ['Username',    profile?.userRef?.username || profile?.studentId || '—'],
               ['Email',       profile?.email || '—'],
               ['Mobile',      profile?.mobile],
               ['Preparation', profile?.preparation || '—'],
@@ -170,6 +182,15 @@ export default function ProfilePage() {
             ))}
           </div>
         )}
+      </div>
+
+      <div className="card space-y-4">
+        <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2"><KeyRound className="w-4 h-4 text-library-blue" /> Change Password</h2>
+        <form onSubmit={(event) => { event.preventDefault(); passwordMutation.mutate(passwords); }} className="space-y-3">
+          <input type="password" required minLength={6} className="input" placeholder="Current password" autoComplete="current-password" value={passwords.currentPassword} onChange={(event) => setPasswords({ ...passwords, currentPassword: event.target.value })} />
+          <input type="password" required minLength={6} className="input" placeholder="New password" autoComplete="new-password" value={passwords.newPassword} onChange={(event) => setPasswords({ ...passwords, newPassword: event.target.value })} />
+          <button className="btn btn-secondary" disabled={passwordMutation.isPending}>{passwordMutation.isPending ? 'Updating...' : 'Change password'}</button>
+        </form>
       </div>
     </div>
   );

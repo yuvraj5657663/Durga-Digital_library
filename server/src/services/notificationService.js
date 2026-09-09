@@ -1,4 +1,6 @@
 import nodemailer from 'nodemailer';
+import Notification from '../models/Notification.js';
+import Student from '../models/Student.js';
 import config from '../config/index.js';
 import logger from '../config/logger.js';
 import { generateAdmissionReceipt } from './pdfService.js';
@@ -49,7 +51,7 @@ async function sendEmail({ to, subject, text, html, attachments = [] }) {
       response: err.response
     });
     logger.error('[notificationService] email error:', err.message);
-    return { sent: false, reason: err.message };
+    return { sent: false, reason: err.message, providerError: err.response || err.code || err.message };
   }
 }
 
@@ -62,10 +64,11 @@ function normalizeMobile(mobile) {
 async function sendWhatsApp(mobile, message) {
   const client = global.whatsappClient;
   if (!client || !client.info || !client.info.wid) {
-    console.error('[notificationService] WhatsApp not ready: Client not initialized or authenticated');
-    return { sent: false, reason: 'whatsapp_not_ready' };
+    const reason = 'WhatsApp client not initialized or authenticated';
+    console.error(`[notificationService] ${reason}`);
+    return { sent: false, reason, providerError: reason };
   }
-  if (!mobile) return { sent: false, reason: 'no_mobile' };
+  if (!mobile) return { sent: false, reason: 'no_mobile', providerError: 'Recipient mobile number is missing' };
   
   try {
     const wid = `${normalizeMobile(mobile)}@c.us`;
@@ -75,7 +78,7 @@ async function sendWhatsApp(mobile, message) {
   } catch (err) {
     console.error(`[notificationService] WhatsApp failed to send to ${mobile}:`, err.message);
     logger.error('[notificationService] whatsapp error:', err.message);
-    return { sent: false, reason: err.message };
+    return { sent: false, reason: err.message, providerError: err.response || err.code || err.message };
   }
 }
 
@@ -132,16 +135,53 @@ export async function send(opts = {}) {
     }
     const result = await sendEmail({ to: email, subject: title, text: body, attachments: emailAttachments });
     sentVia.email = result.sent;
-    await notificationRepository.updateOne({ _id: notif._id }, { 'sentVia.email': result.sent });
+    await notificationRepository.updateOne({ _id: notif._id }, {
+      'sentVia.email': result.sent,
+      'delivery.email.status': result.sent ? 'SENT' : 'FAILED',
+      'delivery.email.error': result.sent ? '' : (result.providerError || result.reason || 'Email delivery failed'),
+      'delivery.email.messageId': result.messageId || '',
+      'delivery.email.attemptedAt': new Date(),
+      ...(result.sent ? { 'delivery.email.sentAt': new Date() } : {})
+    });
+  } else {
+    await notificationRepository.updateOne({ _id: notif._id }, { 'delivery.email.status': 'SKIPPED' });
   }
 
   if (channel === 'whatsapp' || channel === 'all') {
     const result = await sendWhatsApp(mobile, `*${title}*\n\n${body}`);
     sentVia.whatsapp = result.sent;
-    await notificationRepository.updateOne({ _id: notif._id }, { 'sentVia.whatsapp': result.sent });
+    await notificationRepository.updateOne({ _id: notif._id }, {
+      'sentVia.whatsapp': result.sent,
+      'delivery.whatsapp.status': result.sent ? 'SENT' : 'FAILED',
+      'delivery.whatsapp.error': result.sent ? '' : (result.providerError || result.reason || 'WhatsApp delivery failed'),
+      'delivery.whatsapp.attemptedAt': new Date(),
+      ...(result.sent ? { 'delivery.whatsapp.sentAt': new Date() } : {})
+    });
+  } else {
+    await notificationRepository.updateOne({ _id: notif._id }, { 'delivery.whatsapp.status': 'SKIPPED' });
   }
 
   return { notification: notif, sentVia };
+}
+
+export async function retry(notificationId, channels = ['email', 'whatsapp']) {
+  const notification = await Notification.findById(notificationId);
+  if (!notification) throw new Error('Notification not found');
+
+  const student = notification.recipient ? await Student.findById(notification.recipient) : null;
+  const result = await send({
+    recipient: notification.recipient,
+    type: notification.type,
+    title: notification.title,
+    body: notification.body,
+    channel: channels.length === 2 ? 'all' : channels[0],
+    email: student?.email,
+    mobile: student?.mobile,
+    metadata: notification.metadata
+  });
+
+  await Notification.findByIdAndUpdate(notificationId, { $inc: { retryCount: 1 } });
+  return result;
 }
 
 export async function sendRenewalReminder({ student, daysLeft }) {

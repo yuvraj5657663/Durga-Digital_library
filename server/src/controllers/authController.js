@@ -1,4 +1,5 @@
 import { login, refreshToken, registerStudent, changePassword } from '../services/authService.js';
+import { requestPasswordReset, resetPasswordWithOtp } from '../services/passwordResetService.js';
 import { successResponse, errorResponse } from '../utils/response.js';
 import { asyncHandler } from '../utils/errors.js';
 import logger from '../config/logger.js';
@@ -38,4 +39,18 @@ export const changePasswordController = asyncHandler(async (req, res) => {
   
   const result = await changePassword(userId, currentPassword, newPassword);
   return successResponse(res, result, 'Password changed successfully');
+});
+
+export const requestPasswordResetController = asyncHandler(async (req, res) => {
+  const result = await requestPasswordReset(req.body.email, req.ip);
+  return successResponse(res, result, result.message);
+});
+
+export const resetPasswordController = asyncHandler(async (req, res) => {
+  try {
+    await resetPasswordWithOtp(req.body.email, req.body.otp, req.body.newPassword);
+  } catch (error) {
+    return errorResponse(res, { message: 'Invalid or expired reset code', code: 'INVALID_RESET_CODE' }, 400);
+  }
+  return successResponse(res, { success: true }, 'Password reset successfully');
 });

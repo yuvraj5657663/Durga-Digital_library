@@ -31,3 +31,22 @@ export const changePasswordSchema = Joi.object({
     'any.required': 'New password is required'
   })
 });
+
+export const passwordResetRequestSchema = Joi.object({
+  email: Joi.string().email().required().messages({
+    'string.email': 'A valid email address is required',
+    'any.required': 'Email is required'
+  })
+});
+
+export const passwordResetConfirmSchema = Joi.object({
+  email: Joi.string().email().required(),
+  otp: Joi.string().pattern(/^\d{6}$/).required().messages({
+    'string.pattern.base': 'OTP must be a 6-digit code',
+    'any.required': 'OTP is required'
+  }),
+  newPassword: Joi.string().min(6).required().messages({
+    'string.min': 'New password must be at least 6 characters',
+    'any.required': 'New password is required'
+  })
+});

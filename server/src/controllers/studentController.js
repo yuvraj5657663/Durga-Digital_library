@@ -11,9 +11,13 @@ import Student from '../models/Student.js';
 import Membership from '../models/Membership.js';
 import Payment from '../models/Payment.js';
 import Attendance from '../models/Attendance.js';
+import Notification from '../models/Notification.js';
+import WiFiSession from '../models/WiFiSession.js';
+import AdmissionRequest from '../models/AdmissionRequest.js';
 import Seat from '../models/Seat.js';
 import logger from '../config/logger.js';
 import { sendMembershipActivated, send as sendNotif } from '../services/notificationService.js';
+import { recordCashPayment } from '../services/paymentService.js';
 import { toDataURL } from '../services/qrService.js';
 import config from '../config/index.js';
 import { toActorId } from '../utils/actorId.js';
@@ -39,6 +43,16 @@ export const createStudentController = asyncHandler(async (req, res) => {
 
   if (!body.name || !body.mobile) {
     throw new ValidationError('name and mobile are required');
+  }
+
+  const normalizedMobile = body.mobile.replace(/\D/g, '').length === 10
+    ? `91${body.mobile.replace(/\D/g, '')}`
+    : body.mobile.replace(/\D/g, '');
+  const duplicateMobile = await Student.findOne({ normalizedMobile, status: { $ne: 'Inactive' } });
+  if (duplicateMobile) throw new ConflictError('A student already exists for this mobile number');
+  if (body.email) {
+    const duplicateEmail = await User.findOne({ email: body.email.trim().toLowerCase(), active: true });
+    if (duplicateEmail) throw new ConflictError('A user already exists for this email address');
   }
 
   // Check duplicate: same seatCode + shift combo only (not same mobile)
@@ -75,9 +89,7 @@ export const createStudentController = asyncHandler(async (req, res) => {
       qrCodeUrl:       qrDataUrl,
       status:          'Active',
       customTiming:    body.customTiming || '',
-      normalizedMobile: body.mobile.replace(/\D/g, '').length === 10
-        ? `91${body.mobile.replace(/\D/g, '')}`
-        : body.mobile.replace(/\D/g, '')
+      normalizedMobile
     }], { session });
 
     // 4. Upsert Seat
@@ -125,9 +137,7 @@ export const createStudentController = asyncHandler(async (req, res) => {
       passwordHash,
       role:             'student',
       mobile:           body.mobile,
-      normalizedMobile: body.mobile.replace(/\D/g, '').length === 10
-        ? `91${body.mobile.replace(/\D/g, '')}`
-        : body.mobile.replace(/\D/g, ''),
+        normalizedMobile,
       studentRef:       student._id
     }], { session });
 
@@ -150,18 +160,20 @@ export const createStudentController = asyncHandler(async (req, res) => {
       activatedBy: toActorId(req.user.id)
     }], { session });
 
-    // 7. Create Payment record
-    await Payment.create([{
-      student:    student._id,
+    // 7. Record the admission payment through the shared payment service
+    await recordCashPayment({
+      student: student._id,
       membership: membership._id,
       receiptNo,
-      type:       'admission',
-      amount:     parseFloat(body.fee) || 0,
-      mode:       (body.paymentMode || 'cash').toLowerCase(),
-      status:     'completed',
-      paidOn:     startDate,
-      collectedBy:toActorId(req.user.id)
-    }], { session });
+      type: 'admission',
+      amount: parseFloat(body.fee) || 0,
+      paidOn: startDate,
+      plan: body.duration || '1 Month(s)',
+      reference: body.reference || body.transactionId || '',
+      notes: body.notes || '',
+      collectedBy: req.user.id,
+      session
+    });
 
     // 8. Audit log
     await AuditLog.create([{
@@ -408,7 +420,7 @@ export const getDashboardStatsController = asyncHandler(async (req, res) => {
     todayAttendance,
     monthRevAgg,
     seatsOccupied,
-    pendingAdmissions
+    pendingAdmissions, todayRevenueAgg, pendingNotifications, wifiConnectedNow, todayAdmissions
   ] = await Promise.all([
     Student.countDocuments(branchFilter),
     Student.countDocuments({ status: 'Active',   ...branchFilter }),
@@ -417,11 +429,18 @@ export const getDashboardStatsController = asyncHandler(async (req, res) => {
     Student.countDocuments({ status: 'Active', expiryDate: { $lte: in5Str, $gte: today }, ...branchFilter }),
     Attendance.countDocuments({ date: today }),
     Payment.aggregate([
-      { $match: { paidOn: { $regex: `^${thisMonth}` }, status: 'completed' } },
+      { $match: { paidOn: { $regex: `^${thisMonth}` }, status: { $in: ['PAID', 'completed'] } } },
       { $group: { _id: null, total: { $sum: '$amount' } } }
     ]),
     Seat.countDocuments({ is_booked: 1 }),
-    mongoose.model('AdmissionRequest').countDocuments({ admission_status: 'Pending' })
+    AdmissionRequest.countDocuments({ admission_status: 'Pending' }),
+    Payment.aggregate([
+      { $match: { paidOn: today, status: { $in: ['PAID', 'completed'] } } },
+      { $group: { _id: null, total: { $sum: '$amount' } } }
+    ]),
+    Notification.countDocuments({ isRead: false }),
+    WiFiSession.countDocuments({ status: 'active', expiresAt: { $gt: new Date() } }),
+    Student.countDocuments({ createdAt: { $gte: new Date(`${today}T00:00:00.000Z`) }, ...branchFilter })
   ]);
 
   // Shift-wise occupancy
@@ -456,7 +475,7 @@ export const getDashboardStatsController = asyncHandler(async (req, res) => {
 
   // Monthly revenue last 6 months
   const revenueByMonth = await Payment.aggregate([
-    { $match: { status: 'completed' } },
+    { $match: { status: { $in: ['PAID', 'completed'] } } },
     { $group: {
       _id: { $substr: ['$paidOn', 0, 7] },
       total: { $sum: '$amount' }
@@ -469,6 +488,10 @@ export const getDashboardStatsController = asyncHandler(async (req, res) => {
     total, active, inactive, expired, expiringSoon,
     todayAttendance,
     monthRevenue:    monthRevAgg[0]?.total || 0,
+    todayRevenue:    todayRevenueAgg[0]?.total || 0,
+    todayAdmissions,
+    pendingNotifications,
+    wifiConnectedNow,
     seatsOccupied,
     pendingAdmissions,
     shiftOccupancy:  shiftOccupancy.map(s => ({ shift: s._id || 'Unknown', count: s.count })),

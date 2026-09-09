@@ -6,7 +6,13 @@ const userSchema = new mongoose.Schema(
     username: { type: String, trim: true, lowercase: true, sparse: true, unique: true },
     email: { type: String, trim: true, lowercase: true, required: true, unique: true, index: true },
     passwordHash: { type: String, required: true },
-    role: { type: String, enum: ['admin', 'student'], required: true, default: 'student' },
+    role: {
+      type: String,
+      enum: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF', 'ACCOUNTANT', 'LIBRARIAN', 'SUPPORT', 'admin', 'student'],
+      required: true,
+      default: 'student'
+    },
+    permissions: [{ type: String, trim: true }],
     mobile: { type: String, trim: true, index: true, default: '' },
     normalizedMobile: { type: String, trim: true, default: '' },
     active: { type: Boolean, default: true },

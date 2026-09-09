@@ -2,8 +2,10 @@ import Student from '../models/Student.js';
 import Membership from '../models/Membership.js';
 import Attendance from '../models/Attendance.js';
 import Payment from '../models/Payment.js';
+import { generateAdmissionReceipt, generateRenewalReceipt } from '../services/pdfService.js';
 import Notification from '../models/Notification.js';
 import Announcement from '../models/Announcement.js';
+import WiFiSession from '../models/WiFiSession.js';
 import { successResponse, paginatedResponse } from '../utils/response.js';
 import { asyncHandler, NotFoundError, ValidationError } from '../utils/errors.js';
 import { getForStudent, markRead } from '../services/notificationService.js';
@@ -14,13 +16,16 @@ import { toDataURL } from '../services/qrService.js';
 export const getDashboardController = asyncHandler(async (req, res) => {
   const studentId = req.user.studentRef;
   
-  const [student, membership, todayAttendance] = await Promise.all([
-    Student.findById(studentId),
+  const [student, membership, todayAttendance, wifiSession] = await Promise.all([
+    Student.findById(studentId).populate('userRef', 'username email'),
     getActive(studentId),
     Attendance.findOne({ 
       student: studentId, 
       date: new Date().toISOString().slice(0, 10) 
-    })
+    }),
+    WiFiSession.findOne({ student: studentId, status: 'active', expiresAt: { $gt: new Date() } })
+      .select('sessionId gatewayId startedAt lastActivityAt expiresAt network device')
+      .populate('device', 'deviceInfo')
   ]);
 
   const notifications = await getForStudent(studentId, { limit: 5, unreadOnly: true });
@@ -29,6 +34,7 @@ export const getDashboardController = asyncHandler(async (req, res) => {
     student,
     membership,
     todayAttendance,
+    wifiSession,
     unreadNotifications: notifications.unreadCount
   };
 
@@ -37,7 +43,7 @@ export const getDashboardController = asyncHandler(async (req, res) => {
 
 export const getProfileController = asyncHandler(async (req, res) => {
   const studentId = req.user.studentRef;
-  const student = await Student.findById(studentId);
+  const student = await Student.findById(studentId).populate('userRef', 'username email');
 
   if (!student) {
     throw new NotFoundError('Student profile not found');
@@ -242,12 +248,18 @@ export const downloadReceiptController = asyncHandler(async (req, res) => {
   const { paymentId } = req.params;
   const studentId = req.user.studentRef;
 
-  const payment = await Payment.findOne({ _id: paymentId, student: studentId });
+  const payment = await Payment.findOne({ _id: paymentId, student: studentId })
+    .populate('student')
+    .populate('membership');
   if (!payment) {
     throw new NotFoundError('Payment not found');
   }
 
-  return successResponse(res, payment, 'Receipt retrieved');
+  const receipt = payment.type === 'renewal'
+    ? await generateRenewalReceipt({ student: payment.student, membership: payment.membership, payment })
+    : await generateAdmissionReceipt({ student: payment.student, payment });
+  res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="Receipt_${payment.receiptNo || payment._id}.pdf"` });
+  return res.send(receipt);
 });
 
 export const getNotificationsController = asyncHandler(async (req, res) => {

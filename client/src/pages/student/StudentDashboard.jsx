@@ -6,6 +6,7 @@ import {
   Calendar, CreditCard, Bell, CheckCircle, Clock,
   Armchair, User, ChevronRight, Loader2, AlertTriangle,
   History, RefreshCw
+  ,Wifi
 } from 'lucide-react';
 import { portalService } from '../../services/portalService';
 import AspirantQuoteCard from '../../components/student/AspirantQuoteCard';
@@ -169,7 +170,7 @@ export default function StudentDashboard() {
   const navigate = useNavigate();
   const [renewalModalOpen, setRenewalModalOpen] = useState(false);
 
-  const { data: dashboard, isLoading } = useQuery({
+  const { data: dashboard, isLoading, isError } = useQuery({
     queryKey: ['student', 'dashboard'],
     queryFn:  () => portalService.getDashboard(),
     staleTime: 30_000,
@@ -186,6 +187,7 @@ export default function StudentDashboard() {
 
   return (
     <div className="space-y-5">
+      {isError && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">Dashboard data could not be loaded. Please refresh.</div>}
 
       {/* ── Greeting ── */}
       <div className="flex items-center justify-between">
@@ -285,6 +287,11 @@ export default function StudentDashboard() {
               </p>}
           <p className="text-xs text-gray-400">unread message{unreadN !== 1 ? 's' : ''}</p>
         </div>
+      </div>
+
+      <div className="card flex items-center justify-between border-l-4 border-cyan-500">
+        <div><p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">WiFi session</p><p className="text-sm font-semibold text-gray-900 mt-1">{dashboard?.wifiSession ? 'Connected' : 'Not connected'}</p>{dashboard?.wifiSession && <p className="text-xs text-gray-500">Last seen {new Date(dashboard.wifiSession.lastActivityAt).toLocaleTimeString('en-IN')}</p>}</div>
+        <Wifi className={`w-5 h-5 ${dashboard?.wifiSession ? 'text-green-600' : 'text-gray-400'}`} />
       </div>
 
       {/* ── Info + Quick Actions ── */}

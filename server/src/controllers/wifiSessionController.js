@@ -107,29 +107,87 @@ export const getSessionController = asyncHandler(async (req, res) => {
  * Get all sessions with pagination (admin only)
  */
 export const getAllSessionsController = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 50, status, studentId } = req.query;
+  const { page = 1, limit = 50, status, studentId, search, view = 'all' } = req.query;
   
   const filter = {};
-  if (status) filter.status = status;
+  if (status && status !== 'disconnected') filter.status = status;
   if (studentId) {
     const student = await Student.findOne({ studentId });
     if (student) filter.student = student._id;
+  }
+  if (search) {
+    const matchingStudents = await Student.find({
+      $or: [
+        { name: new RegExp(search, 'i') },
+        { studentId: new RegExp(search, 'i') },
+        { mobile: new RegExp(search, 'i') }
+      ]
+    }).select('_id');
+    filter.$or = [
+      { student: { $in: matchingStudents.map(student => student._id) } },
+      { sessionId: new RegExp(search, 'i') },
+      { gatewayId: new RegExp(search, 'i') }
+    ];
+  }
+  if (view === 'today') {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    filter.startedAt = { $gte: start };
   }
 
   const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
 
   const [sessions, total] = await Promise.all([
     WiFiSession.find(filter)
-      .populate('student', 'name studentId mobile email')
-      .populate('device', 'deviceId deviceInfo')
-      .sort({ createdAt: -1 })
+      .populate('student', 'name studentId mobile email status expiryDate branch seatCode membershipRef')
+      .populate('device', 'deviceId deviceInfo deviceFingerprint status')
+      .populate('attendance.attendanceId', 'date checkIn checkOut durationMins status')
+      .sort({ startedAt: -1 })
       .skip(skip)
       .limit(parseInt(limit, 10)),
     WiFiSession.countDocuments(filter)
   ]);
 
+  const now = Date.now();
+  const enrichedSessions = sessions.map(session => {
+    const isDisconnected = session.status === 'active' &&
+      now - new Date(session.lastActivityAt).getTime() > 5 * 60 * 1000;
+    const liveStatus = session.status === 'active'
+      ? (new Date(session.expiresAt).getTime() <= now ? 'EXPIRED' : isDisconnected ? 'DISCONNECTED' : 'ACTIVE')
+      : session.status.toUpperCase();
+    const deviceInfo = session.device?.deviceInfo || {};
+    return {
+      ...session.toObject(),
+      authorized: Boolean(session.student && session.device),
+      liveStatus,
+      student: session.student ? {
+        ...session.student.toObject(),
+        membershipStatus: session.student.status === 'Active' && session.student.expiryDate >= new Date().toISOString().slice(0, 10)
+          ? 'ACTIVE' : 'EXPIRED'
+      } : null,
+      device: session.device ? {
+        ...session.device.toObject(),
+        name: deviceInfo.name || 'Unknown device',
+        type: deviceInfo.type || 'other',
+        browserOs: deviceInfo.platform || session.device.deviceFingerprint?.userAgent || ''
+      } : null,
+      connection: {
+        ipAddress: session.network?.ipAddress || '',
+        gatewayId: session.gatewayId,
+        connectionTime: session.startedAt,
+        lastSeen: session.lastActivityAt,
+        expiresAt: session.expiresAt
+      },
+      attendance: session.attendance?.attendanceId || null
+    };
+  });
+
+  const visibleSessions = status && status.toUpperCase() === 'DISCONNECTED'
+    ? enrichedSessions.filter(session => session.liveStatus === 'DISCONNECTED')
+    : enrichedSessions;
+
   return successResponse(res, {
-    sessions,
+    sessions: visibleSessions,
     pagination: {
       page: parseInt(page, 10),
       limit: parseInt(limit, 10),

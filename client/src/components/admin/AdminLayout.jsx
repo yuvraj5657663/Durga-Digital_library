@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import {
   LayoutDashboard, Users, Calendar, Megaphone,
-  FileText, LogOut, Menu, X, Bell, Check, UserPlus
+  FileText, LogOut, Menu, X, Bell, Check, UserPlus, Wifi
 } from 'lucide-react';
 import { notificationService } from '../../services/notificationService';
 import api from '../../services/api';
@@ -17,6 +17,7 @@ import AttendancePage    from '../../pages/admin/AttendancePage';
 import AnnouncementsPage from '../../pages/admin/AnnouncementsPage';
 import AdmissionsPage    from '../../pages/admin/AdmissionsPage';
 import OnlineAdmissionRequests from './OnlineAdmissionRequests';
+import WifiSessionsPage from '../../pages/admin/WifiSessionsPage';
 
 const AdminLayout = () => {
   const { logout, user } = useAuth();
@@ -99,6 +100,7 @@ const AdminLayout = () => {
     { name: 'Dashboard',   href: '/admin',              icon: LayoutDashboard },
     { name: 'Students',    href: '/admin/students',      icon: Users           },
     { name: 'Attendance',  href: '/admin/attendance',    icon: Calendar        },
+    { name: 'Connected WiFi', href: '/admin/wifi',         icon: Wifi            },
     { name: 'Admissions',  href: '/admin/admissions',    icon: FileText        },
     { name: 'Online Admission', href: '/admin/online-admissions', icon: UserPlus, badge: pendingAdmissionsCount },
     { name: 'Announcements', href: '/admin/announcements', icon: Megaphone     },
@@ -314,6 +316,7 @@ const AdminLayout = () => {
             <Route path="admissions"      element={<AdmissionsPage />} />
             <Route path="online-admissions" element={<OnlineAdmissionRequests />} />
             <Route path="announcements"   element={<AnnouncementsPage />} />
+            <Route path="wifi" element={<WifiSessionsPage />} />
           </Routes>
         </main>
       </div>

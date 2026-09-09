@@ -7,7 +7,8 @@ const notificationSchema = new mongoose.Schema(
       type: String,
       enum: ['renewal_reminder', 'membership_activated', 'membership_expired',
              'announcement', 'payment_received', 'attendance_marked',
-             'password_reset', 'custom', 'admission_inquiry', 'admission_inquiry_alert'],
+             'password_reset', 'custom', 'admission_inquiry', 'admission_inquiry_alert',
+             'payment_reminder', 'membership_expiring', 'membership_expired_reminder'],
       required: true,
       index: true
     },
@@ -19,6 +20,23 @@ const notificationSchema = new mongoose.Schema(
       email: { type: Boolean, default: false },
       whatsapp: { type: Boolean, default: false }
     },
+    delivery: {
+      email: {
+        status: { type: String, enum: ['PENDING', 'SENT', 'FAILED', 'SKIPPED'], default: 'PENDING' },
+        error: { type: String, default: '' },
+        messageId: { type: String, default: '' },
+        attemptedAt: { type: Date },
+        sentAt: { type: Date }
+      },
+      whatsapp: {
+        status: { type: String, enum: ['PENDING', 'SENT', 'FAILED', 'SKIPPED'], default: 'PENDING' },
+        error: { type: String, default: '' },
+        attemptedAt: { type: Date },
+        sentAt: { type: Date }
+      }
+    },
+    sentBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    retryCount: { type: Number, default: 0 },
     metadata: { type: mongoose.Schema.Types.Mixed, default: {} },
     expiresAt: { type: Date, default: null }
   },

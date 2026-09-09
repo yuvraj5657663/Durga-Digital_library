@@ -11,8 +11,9 @@ import Payment from '../models/Payment.js';
 import Seat from '../models/Seat.js';
 import { successResponse, paginatedResponse } from '../utils/response.js';
 import { asyncHandler } from '../utils/errors.js';
-import { ValidationError, NotFoundError } from '../utils/errors.js';
+import { ValidationError, NotFoundError, ConflictError } from '../utils/errors.js';
 import { send as sendNotif } from '../services/notificationService.js';
+import { recordCashPayment } from '../services/paymentService.js';
 import { toActorId } from '../utils/actorId.js';
 import { toDataURL } from '../services/qrService.js';
 import config from '../config/index.js';
@@ -97,10 +98,20 @@ export const createAdmissionRequestController = asyncHandler(async (req, res) =>
     throw new ValidationError('Email address is invalid');
   }
 
+  const normalizedMobile = normalizeMobile(mobile);
+  const [existingStudent, existingUser, existingRequest] = await Promise.all([
+    Student.findOne({ normalizedMobile, status: { $ne: 'Inactive' } }),
+    email ? User.findOne({ email: email.toLowerCase(), active: true }) : null,
+    AdmissionRequest.findOne({ normalizedMobile, admission_status: 'Pending' })
+  ]);
+  if (existingStudent) throw new ConflictError('A student already exists for this mobile number');
+  if (existingUser) throw new ConflictError('A user already exists for this email address');
+  if (existingRequest) throw new ConflictError('An admission request is already pending for this mobile number');
+
   const newRequest = await AdmissionRequest.create({
     name,
     mobile,
-    normalizedMobile: normalizeMobile(mobile),
+    normalizedMobile,
     email,
     preparation,
     preferred_shift,
@@ -260,18 +271,20 @@ export const approveAdmissionRequestController = asyncHandler(async (req, res) =
       activatedBy: toActorId(adminUser.id)
     }], { session });
 
-    // Create Payment
-    await Payment.create([{
-      student:    createdStudent._id,
+    // Record the admission payment through the shared payment service
+    await recordCashPayment({
+      student: createdStudent._id,
       membership: membership._id,
       receiptNo,
-      type:       'admission',
-      amount:     parseFloat(fee),
-      mode:       'cash',
-      status:     'completed',
-      paidOn:     joiningDate,
-      collectedBy:toActorId(adminUser.id)
-    }], { session });
+      type: 'admission',
+      amount: parseFloat(fee),
+      paidOn: joiningDate,
+      plan: duration || '1 Month(s)',
+      reference: approvalDetails.reference || '',
+      notes: approvalDetails.paymentNotes || '',
+      collectedBy: adminUser.id,
+      session
+    });
 
     // Update AdmissionRequest
     await AdmissionRequest.findByIdAndUpdate(
