@@ -25,6 +25,7 @@
  */
 
 const NS = 'ddl';
+const STAFF_ROLES = ['admin', 'SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF', 'ACCOUNTANT', 'LIBRARIAN', 'SUPPORT'];
 
 /* ── JWT payload decode (no signature verify — client-side only) ─────────── */
 function decodeJwtPayload(token) {
@@ -55,10 +56,10 @@ function getRoleFromToken(token) {
 export function getActiveRole() {
   // Tab-local role wins
   const tabRole = sessionStorage.getItem(`${NS}.role`);
-  if (tabRole === 'admin' || tabRole === 'student') return tabRole;
+  if (STAFF_ROLES.includes(tabRole) || tabRole === 'student') return tabRole;
 
   // Fall back: decode from whichever token is stored
-  for (const role of ['admin', 'student']) {
+  for (const role of [...STAFF_ROLES, 'student']) {
     const token = localStorage.getItem(`${NS}.${role}.accessToken`);
     if (token) {
       const decoded = decodeJwtPayload(token);
@@ -158,7 +159,7 @@ export function updateUser(userData, role) {
  * Does NOT verify the JWT signature — just checks existence + expiry.
  */
 export function hasAnySession() {
-  for (const role of ['admin', 'student']) {
+  for (const role of [...STAFF_ROLES, 'student']) {
     const token = localStorage.getItem(key(role, 'accessToken'));
     if (!token) continue;
     const payload = decodeJwtPayload(token);
