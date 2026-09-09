@@ -1,16 +1,18 @@
 // Mock RegisteredDeviceRepository for Jest tests
 const mockRegisteredDeviceRepository = {
+  findById: jest.fn(),
   findByDeviceId: jest.fn(),
-  findByFingerprint: jest.fn(),
-  findByMacAddress: jest.fn(),
-  findByUserAgent: jest.fn(),
+  findByStudent: jest.fn(),
+  findActiveByStudent: jest.fn(),
   createDevice: jest.fn(),
-  updateLastSeen: jest.fn(),
-  updateSecurityCheck: jest.fn(),
   updateStatus: jest.fn(),
-  countActiveByStudentId: jest.fn(),
-  findByStudentId: jest.fn(),
-  findActiveByStudentId: jest.fn()
+  updateLastSeen: jest.fn(),
+  revokeDevice: jest.fn(),
+  suspendDevice: jest.fn(),
+  reactivateDevice: jest.fn(),
+  countActiveByStudent: jest.fn(),
+  findByMacAddress: jest.fn(),
+  deleteByStudent: jest.fn()
 };
 
 export default mockRegisteredDeviceRepository;

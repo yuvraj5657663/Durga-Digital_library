@@ -124,7 +124,18 @@ export async function login(username, password, ip, userAgent) {
 
 export async function refreshToken(refreshToken) {
   try {
-    const decoded = jwt.verify(refreshToken, config.jwt.secret);
+    let decoded;
+    try {
+      decoded = jwt.verify(refreshToken, config.jwt.secret);
+    } catch (jwtErr) {
+      // Convert ALL jwt errors explicitly to AuthenticationError (401)
+      throw new AuthenticationError(
+        jwtErr.name === 'TokenExpiredError'
+          ? 'Refresh token expired'
+          : 'Invalid refresh token'
+      );
+    }
+
     const user = decoded.userId === 'env-admin'
       ? getEnvAdminUser()
       : await userRepository.findById(decoded.userId);
@@ -133,14 +144,15 @@ export async function refreshToken(refreshToken) {
       throw new AuthenticationError('Invalid refresh token');
     }
 
-    const accessToken  = signAccessToken(user);
+    const accessToken      = signAccessToken(user);
     const nextRefreshToken = signRefreshToken(user);
 
     return { accessToken, refreshToken: nextRefreshToken };
   } catch (error) {
-    // Re-throw AuthenticationError and JWT errors as-is
+    // Re-throw AuthenticationError as-is (already has statusCode 401)
     if (error.statusCode) throw error;
-    logger.error('Refresh token error:', error.message);
+    // Anything else is unexpected — wrap as AuthenticationError so we never leak 500
+    logger.error('Refresh token unexpected error:', error.message);
     throw new AuthenticationError('Invalid or expired refresh token');
   }
 }

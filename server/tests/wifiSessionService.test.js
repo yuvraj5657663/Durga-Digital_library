@@ -268,8 +268,9 @@ describe('WiFi Session Service', () => {
       const { default: wifiSessionRepository } = await import('../src/repositories/WiFiSessionRepository.js');
       wifiSessionRepository.findBySessionId.mockResolvedValue(mockSession);
       
+      // Service uses findById (ObjectId lookup) for the device stored in session.device
       const { default: registeredDeviceRepository } = await import('../src/repositories/RegisteredDeviceRepository.js');
-      registeredDeviceRepository.findByDeviceId.mockResolvedValue(mockDevice);
+      registeredDeviceRepository.findById.mockResolvedValue(mockDevice);
       
       const { default: studentRepository } = await import('../src/repositories/StudentRepository.js');
       studentRepository.findById.mockResolvedValue(mockStudent);
@@ -373,8 +374,9 @@ describe('WiFi Session Service', () => {
       const { default: wifiSessionRepository } = await import('../src/repositories/WiFiSessionRepository.js');
       wifiSessionRepository.findBySessionId.mockResolvedValue(mockSession);
       
+      // Service uses findById (ObjectId lookup)
       const { default: registeredDeviceRepository } = await import('../src/repositories/RegisteredDeviceRepository.js');
-      registeredDeviceRepository.findByDeviceId.mockResolvedValue({ ...mockDevice, status: 'revoked' });
+      registeredDeviceRepository.findById.mockResolvedValue({ ...mockDevice, status: 'revoked' });
 
       const result = await validateWiFiSession('valid-token', 'WFS-XYZ789');
 

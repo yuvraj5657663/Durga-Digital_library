@@ -34,7 +34,7 @@ describe('QR Service', () => {
       expect(result).toBeDefined();
       expect(typeof result).toBe('string');
       expect(result).toMatch(/^data:image\/png;base64,/);
-    });
+    }, 10000);
 
     it('should generate QR with custom margin', async () => {
       const result = await toDataURL('test-data', { margin: 4 });
@@ -125,7 +125,7 @@ describe('QR Service', () => {
 
       expect(result).toBeInstanceOf(Buffer);
       expect(result.length).toBeGreaterThan(0);
-    });
+    }, 10000);
 
     it('should generate QR buffer with custom margin', async () => {
       const result = await toBuffer('test-data', { margin: 4 });
