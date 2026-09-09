@@ -33,6 +33,7 @@ class ErrorMonitor {
     // Log the error
     logger.error({
       error: error.message,
+      details: error.details || error.errors || error.validationErrors,
       stack: error.stack,
       name: error.name,
       context,

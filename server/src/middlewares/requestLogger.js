@@ -11,6 +11,9 @@ export const requestLogger = (req, res, next) => {
     userAgent: req.headers['user-agent'],
     userId: req.user?.id,
     role: req.user?.role,
+    ...(req.method === 'POST' && req.originalUrl.endsWith('/admin/memberships/renew')
+      ? { renewalPayload: req.body }
+      : {}),
   });
 
   // Log response

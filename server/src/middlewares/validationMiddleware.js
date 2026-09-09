@@ -1,4 +1,5 @@
 import { ValidationError } from '../utils/errors.js';
+import logger from '../config/logger.js';
 
 export const validate = (schema) => {
   return (req, res, next) => {
@@ -12,6 +13,13 @@ export const validate = (schema) => {
         field: detail.path.join('.'),
         message: detail.message
       }));
+      logger.error({
+        message: 'Request validation failed',
+        url: req.originalUrl,
+        method: req.method,
+        details,
+        payload: req.originalUrl.endsWith('/admin/memberships/renew') ? req.body : undefined
+      });
       
       return next(new ValidationError('Validation failed', details));
     }

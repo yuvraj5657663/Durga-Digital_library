@@ -18,7 +18,7 @@ const wifiSessionSchema = new mongoose.Schema(
     },
     
     startedAt: { type: Date, default: Date.now },
-    expiresAt: { type: Date, required: true, index: true },
+    expiresAt: { type: Date, required: true },
     lastActivityAt: { type: Date, default: Date.now },
     
     network: {
