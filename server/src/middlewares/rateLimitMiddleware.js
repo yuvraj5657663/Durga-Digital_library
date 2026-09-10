@@ -19,7 +19,7 @@ export const createRateLimiter = (options = {}) => {
 
 export const loginLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10 // 10 attempts
+  max: 100 // 100 attempts (increased for development/testing)
 });
 
 export const apiLimiter = createRateLimiter({
