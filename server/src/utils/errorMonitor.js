@@ -8,6 +8,7 @@ class ErrorMonitor {
   }
 
   logError(error, context = {}) {
+    const message = error?.message || String(error) || 'Unknown error';
     const errorKey = this.getErrorKey(error);
     const now = Date.now();
     
@@ -32,7 +33,7 @@ class ErrorMonitor {
     
     // Log the error
     logger.error({
-      error: error.message,
+      error: message,
       details: error.details || error.errors || error.validationErrors,
       stack: error.stack,
       name: error.name,
@@ -42,7 +43,7 @@ class ErrorMonitor {
   }
 
   getErrorKey(error) {
-    return `${error.name}:${error.message}`;
+    return `${error?.name || 'Error'}:${error?.message || String(error) || 'Unknown error'}`;
   }
 
   sendAlert(error, context, count) {

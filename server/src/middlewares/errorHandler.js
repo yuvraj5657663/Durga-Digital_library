@@ -7,12 +7,13 @@ export const errorHandler = (err, req, res, next) => {
   error.message = err.message;
 
   // Log error with centralized monitoring
-  errorMonitor.logError(error, {
+  errorMonitor.logError(err, {
     url: req.originalUrl,
     method: req.method,
     ip: req.ip,
     userId: req.user?.id,
     userAgent: req.headers['user-agent'],
+    details: err.details || err.errors || err.validationErrors,
   });
 
   // Mongoose bad ObjectId
