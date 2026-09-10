@@ -23,8 +23,8 @@ const router = express.Router();
 router.use(authMiddleware, requireAdmin);
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
-router.get('/stats',           requirePermission('REPORT_VIEW'), studentController.getDashboardStatsController);
-router.get('/dashboard-stats', requirePermission('REPORT_VIEW'), studentController.getDashboardStatsController);
+router.get('/stats',           studentController.getDashboardStatsController);
+router.get('/dashboard-stats', studentController.getDashboardStatsController);
 router.post('/analytics/query', requirePermission('REPORT_VIEW'), adminAnalyticsController.answerAnalyticsController);
 
 // ── Seat Matrix ───────────────────────────────────────────────────────────────
