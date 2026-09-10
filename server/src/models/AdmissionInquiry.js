@@ -9,7 +9,7 @@ const admissionInquirySchema = new mongoose.Schema(
     shift: { 
       type: String, 
       required: true, 
-      enum: ['Morning', 'Afternoon', 'Evening', 'Full Day'],
+      enum: ['Morning', 'Afternoon', 'Evening', 'Full Day', 'Special 6-Hour'],
       default: 'Morning'
     },
     joiningDate: { type: Date, required: true },
