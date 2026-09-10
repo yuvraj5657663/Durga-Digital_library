@@ -9,9 +9,16 @@ import StudentLayout from './components/student/StudentLayout';
 function AppRoutes() {
   const { isAuthenticated, loading, isAdmin } = useAuth();
 
-  // Landing page दिखाएं जब loading हो या जब user authenticated न हो
+  // Show loading spinner while checking auth
   if (loading) {
-    return <LandingPage />;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-900">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+          <p className="mt-4 text-slate-400">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
   return (

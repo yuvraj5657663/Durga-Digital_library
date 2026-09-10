@@ -43,11 +43,14 @@ export const AuthProvider = ({ children }) => {
 
     const checkAuth = async () => {
       const token = getAccessToken();  // role-scoped read
+      console.log('[AuthContext] Bootstrap check - token exists:', !!token);
 
       if (token && !user) {
         try {
           // Validate token against the server and hydrate the store
+          console.log('[AuthContext] Calling getCurrentUser...');
           const currentUser = await authService.getCurrentUser();
+          console.log('[AuthContext] getCurrentUser success:', currentUser);
           if (!cancelled) {
             const at = getAccessToken();  // may have been refreshed by interceptor
             setAuth({
@@ -56,11 +59,18 @@ export const AuthProvider = ({ children }) => {
               refreshToken: null,  // store already has this from initial hydration
             });
           }
-        } catch {
+        } catch (err) {
           // Token is invalid / expired and refresh also failed
+          console.error('[AuthContext] Token validation failed:', err);
           if (!cancelled) {
             logout();
           }
+        }
+      } else if (!token) {
+        // No token found - clear any stale user state
+        console.log('[AuthContext] No token found, clearing stale state');
+        if (!cancelled && user) {
+          logout();
         }
       }
 
