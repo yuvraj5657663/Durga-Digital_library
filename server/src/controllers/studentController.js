@@ -270,10 +270,17 @@ export const listStudentsController = asyncHandler(async (req, res) => {
   const { page = 1, limit = 20, status, branch, shift, search } = req.query;
 
   const filter = {};
-  if (status) filter.status = status;
-  if (branch) filter.branch = new RegExp(branch, 'i');
-  if (shift)  filter.shift  = new RegExp(shift, 'i');
-  if (search) {
+  // Only apply status filter if it's a valid, non-empty value
+  if (status && status.trim() !== '') {
+    filter.status = status;
+  }
+  if (branch && branch.trim() !== '') {
+    filter.branch = new RegExp(branch.trim(), 'i');
+  }
+  if (shift && shift.trim() !== '') {
+    filter.shift = new RegExp(shift.trim(), 'i');
+  }
+  if (search && search.trim() !== '') {
     const re = new RegExp(search.trim(), 'i');
     filter.$or = [
       { name: re }, { mobile: re }, { email: re },

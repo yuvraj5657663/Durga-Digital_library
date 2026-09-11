@@ -16,6 +16,7 @@ import {
   setRefreshToken,
   clearSession,
   broadcastLogout,
+  getActiveRole,
 } from '../utils/tokenStorage';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
@@ -55,8 +56,8 @@ function notifyRefreshSubscribers(newToken) {
 }
 
 function forceLogout() {
-  const role = (getAccessToken() && null) || null;  // role is gone — clear everything
-  clearSession();                 // clears scoped keys + sessionStorage role
+  const role = getActiveRole();   // get current role before clearing
+  clearSession(role);             // clears scoped keys + sessionStorage role
   broadcastLogout(role);          // tell other tabs
   window.location.href = '/login';
 }
