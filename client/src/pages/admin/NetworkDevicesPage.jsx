@@ -10,6 +10,20 @@ const STATUS_STYLES = {
   offline: 'bg-gray-100 text-gray-600'
 };
 
+const SOURCE_STYLES = {
+  arp_scan: 'bg-blue-50 text-blue-700',
+  router_dhcp: 'bg-purple-50 text-purple-700',
+  router_arp: 'bg-purple-50 text-purple-700',
+  ping: 'bg-gray-50 text-gray-700'
+};
+
+const SOURCE_LABELS = {
+  arp_scan: 'ARP Scan',
+  router_dhcp: 'Router DHCP',
+  router_arp: 'Router ARP',
+  ping: 'Ping'
+};
+
 const AGENT_STATUS_STYLES = {
   online: 'text-green-600 bg-green-50',
   degraded: 'text-yellow-600 bg-yellow-50',
@@ -40,6 +54,14 @@ function StatusBadge({ status }) {
   return (
     <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${STATUS_STYLES[status] || 'bg-gray-100 text-gray-600'}`}>
       {statusLabels[status] || status}
+    </span>
+  );
+}
+
+function SourceBadge({ source }) {
+  return (
+    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${SOURCE_STYLES[source] || 'bg-gray-100 text-gray-600'}`}>
+      {SOURCE_LABELS[source] || source}
     </span>
   );
 }
@@ -178,10 +200,10 @@ export default function NetworkDevicesPage() {
         )}
         
         <div className="overflow-x-auto">
-          <table className="min-w-[1000px] w-full text-sm">
+          <table className="min-w-[1100px] w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                {['Device', 'IP Address', 'MAC Address', 'Manufacturer', 'Status', 'Linked Student', 'Last Seen', 'Actions'].map((heading) => (
+                {['Device', 'IP Address', 'MAC Address', 'Manufacturer', 'Source', 'Status', 'Linked Student', 'Last Seen', 'Actions'].map((heading) => (
                   <th key={heading} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">
                     {heading}
                   </th>
@@ -191,13 +213,13 @@ export default function NetworkDevicesPage() {
             <tbody className="divide-y divide-gray-100">
               {isLoading ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center text-gray-400">
+                  <td colSpan={9} className="px-4 py-10 text-center text-gray-400">
                     Loading network devices...
                   </td>
                 </tr>
               ) : devices.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center text-gray-400">
+                  <td colSpan={9} className="px-4 py-10 text-center text-gray-400">
                     No network devices found.
                   </td>
                 </tr>
@@ -217,6 +239,7 @@ export default function NetworkDevicesPage() {
                   <td className="px-4 py-4 font-mono text-gray-600">{device.ipAddress}</td>
                   <td className="px-4 py-4 font-mono text-xs text-gray-500">{device.macAddress || '-'}</td>
                   <td className="px-4 py-4 text-gray-600">{device.manufacturer || '-'}</td>
+                  <td className="px-4 py-4"><SourceBadge source={device.source || 'arp_scan'} /></td>
                   <td className="px-4 py-4"><StatusBadge status={device.status} /></td>
                   <td className="px-4 py-4 text-gray-600">{device.linkedStudent ? device.linkedStudent.name : '-'}</td>
                   <td className="px-4 py-4 text-xs text-gray-600">
@@ -273,6 +296,7 @@ export default function NetworkDevicesPage() {
                 <div className="font-medium">{selectedDevice.deviceName}</div>
                 <div className="text-xs text-gray-500 mt-1">{selectedDevice.ipAddress}</div>
                 <div className="text-xs text-gray-500">{selectedDevice.manufacturer}</div>
+                <div className="text-xs text-gray-500 mt-1">Source: {SOURCE_LABELS[selectedDevice.source] || selectedDevice.source}</div>
               </div>
               
               <div>
@@ -293,6 +317,7 @@ export default function NetworkDevicesPage() {
                   className="input"
                   placeholder="e.g., Rahul's Phone"
                 />
+                <p className="text-xs text-gray-500 mt-1">This is a manual label for your reference. It does not affect the detected device name.</p>
               </div>
             </div>
             

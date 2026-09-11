@@ -1,152 +1,346 @@
 # Network Device Testing Instructions
 
-## PHASE 3A - REAL PHONE TEST
+## IMPORTANT SAFETY NOTES
 
-### Pre-Test Baseline
+- Do NOT modify Airtel router configuration
+- Do NOT disable Wi-Fi on the router
+- Do NOT reboot the router
+- Do NOT share Wi-Fi passwords
+- Do NOT request router credentials
+- Do NOT disable private MAC settings on your phone (test with actual settings)
 
-1. **Record Current State:**
-   - Run local network agent: `cd local-network-agent && npm run dev`
-   - Note the number of devices discovered
-   - Check Admin Panel → Network Devices page
-   - Record current device list
+## PRE-TEST PREPARATION
 
-2. **Connect Android Phone:**
-   - Connect phone to Airtel_Durga_Library Wi-Fi
-   - Wait for phone to receive IP (check phone's Wi-Fi settings)
-   - Note the phone's assigned IP address
-   - Note the phone's MAC address (from phone Wi-Fi settings)
+### 1. Start Local Network Agent
 
-3. **Run Discovery:**
-   - Let the agent complete a discovery cycle (30 seconds)
-   - Check agent output for device count
-   - Check Admin Panel for new device
+Open a terminal and run:
 
-4. **Verify Detection:**
-   - Does the phone's IP appear in the device list?
-   - Does the MAC address match the phone's MAC?
-   - What is the device name shown?
-   - What is the manufacturer shown?
-   - What is the status (online/unreachable)?
+```bash
+cd D:\durga-library-system\local-network-agent
+npm run dev
+```
 
-5. **Correlate Device:**
-   - Match the detected IP/MAC with the phone's Wi-Fi settings
-   - Confirm this is the correct device
+You should see:
 
-### PHASE 3B - DISCONNECT TEST
+```
+============================================================
+Durga Digital Library - Network Discovery Agent
+============================================================
+Backend URL: http://localhost:3000
+Agent ID: durga-library-agent-001
+Discovery Interval: 30s
+Local IP: 192.168.1.24
+Local Subnet: 192.168.1.0/24
+============================================================
+Starting discovery loop...
+```
 
-1. **Disconnect Phone:**
-   - Turn Wi-Fi OFF on the phone
-   - Do NOT reboot the router
-   - Do NOT restart the agent
+### 2. Verify Agent is Working
 
-2. **Observe Persistence:**
-   - Watch subsequent discovery cycles (every 30 seconds)
-   - How long does the device remain in the list?
-   - Does the status change?
-   - When does it become "offline" (after 5 minutes of no updates)?
+Wait for the first discovery cycle (30 seconds). You should see:
 
-3. **Expected Behavior:**
-   - Device disappears from ARP table
-   - Agent stops sending the device
-   - Backend marks device offline after 5 minutes
+```
+[timestamp] Starting network discovery...
+Found X devices in ARP table
+Reachable: Y, Unreachable: Z
+✓ Sent X devices to backend
+```
 
-### PHASE 3C - RECONNECT TEST
+### 3. Open Admin Panel
 
-1. **Reconnect Phone:**
-   - Turn Wi-Fi ON on the phone
-   - Wait for IP assignment
+- Go to http://localhost:5173 (or your local frontend URL)
+- Login as admin
+- Navigate to: **Admin → Network Devices**
+- Note the current device count
+- Record the list of existing devices (if any)
 
-2. **Verify Rediscovery:**
-   - Does the device reappear in the list?
-   - Is the IP the same or different?
-   - Is the MAC the same or different (randomized MAC)?
-   - Does status return to "online"?
-   - Is firstSeen preserved from initial discovery?
-   - Does lastSeen update correctly?
+## PHASE 3A - REAL ANDROID PHONE TEST
 
-### PHASE 3D - PRIVATE MAC TEST
+### Step 1: Connect Android Phone
 
-1. **Check Phone Settings:**
-   - Android: Settings → Network & Internet → Wi-Fi → Network name → MAC address type
-   - iOS: Settings → Wi-Fi → Network name → Private Wi-Fi Address
+1. Open Wi-Fi settings on your Android phone
+2. Connect to: **Airtel_Durga_Library**
+3. Wait for the phone to receive an IP address
 
-2. **Document Behavior:**
-   - Is phone using device MAC or randomized MAC?
-   - Does MAC change between connections?
-   - Does the system handle MAC changes correctly?
+### Step 2: Record Phone Information (CRITICAL)
 
-### PHASE 3E - DEVICE NAME VALIDATION
+On your Android phone, go to:
+- Settings → Network & Internet → Wi-Fi
+- Tap on the connected network (Airtel_Durga_Library)
 
-1. **Check Device Name:**
-   - What does the Admin Panel show as device name?
-   - Is it the actual phone name (e.g., "Rahul's Samsung")?
-   - Or is it "Unknown Device"?
-   - Or is it something else?
+Record the following information:
 
-2. **Expected:**
-   - Likely shows "Unknown Device" for Android/iPhone
-   - Router DHCP information not available
-   - DNS/NetBIOS unlikely to resolve phone names
+```
+Phone Information:
+├─ IP Address: _____.___.___.___
+├─ MAC Address: __:__:__:__:__:__
+├─ Private MAC Setting: [Device MAC / Randomized MAC]
+├─ Phone Name: ___________________ (if shown)
+└─ Manufacturer: ___________________ (if shown)
+```
 
-### PHASE 3F - MANUAL DEVICE REGISTRATION
+**IMPORTANT:** You need the actual IP and MAC from the phone to correlate with the discovered device.
 
-1. **Test Device Linking:**
-   - Go to Admin Panel → Network Devices
-   - Click [Link] button on a detected device
-   - Enter student ID (must be existing student)
-   - Optionally enter device label (e.g., "Rahul's Phone")
-   - Click [Link Device]
+### Step 3: Run Discovery
 
-2. **Verify Registration:**
-   - Does the device show the linked student name?
-   - Can you unlink the device?
-   - Does the limit work (max 2 devices per student)?
+The agent runs automatically every 30 seconds. Wait for the next cycle.
 
-## DATA SAFETY CHECKLIST
+You should see output like:
 
-Before testing, verify:
+```
+[timestamp] Starting network discovery...
+Found X devices in ARP table
+Reachable: Y, Unreachable: Z
+✓ Sent X devices to backend
+```
 
-- [ ] No student data will be modified by device discovery
-- [ ] No admission data will be modified
-- [ ] No membership/payment data will be modified
-- [ ] No attendance will be automatically marked
-- [ ] Device registration only links existing devices to existing students
-- [ ] No new students will be created automatically
-- [ ] Existing NetworkDevice records will not be deleted
+### Step 4: Correlate Device
 
-## TEST RESULTS RECORDING
+1. Go to Admin Panel → Network Devices
+2. Look for a device with:
+   - IP address matching your phone's IP
+   - MAC address matching your phone's MAC
 
-Record the following after each test:
+**CRITICAL:** Do NOT assume a device is your phone just because it appeared recently. You must match the IP and MAC.
 
-### Test A: Phone Detection
-- Phone detected: YES/NO
-- Correct IP: YES/NO
-- Correct MAC: YES/NO
-- Manufacturer detected: YES/NO
-- Device name shown: [actual value]
-- Hostname shown: [actual value]
-- Status: [actual value]
+### Step 5: Record Discovery Results
 
-### Test B: Disconnect
-- Device disappeared from ARP: YES/NO
-- Device marked offline: YES/NO
-- Time to offline: [actual time]
+For the matched device, record:
 
-### Test C: Reconnect
-- Device reappeared: YES/NO
-- IP changed: YES/NO
-- MAC changed: YES/NO
-- Status returned to online: YES/NO
+```
+Discovery Results:
+├─ IP Address: _____.___.___.___
+├─ MAC Address: __:__:__:__:__:__
+├─ Device Name: ___________________
+├─ Hostname: ___________________
+├─ Manufacturer: ___________________
+├─ Source: ___________________
+├─ Status: ___________________
+├─ First Seen: ___________________
+└─ Last Seen: ___________________
+```
 
-### Test D: Private MAC
-- Phone using private MAC: YES/NO
-- MAC changed on reconnect: YES/NO
+## PHASE 3B - DISCONNECT TEST
 
-### Test E: Device Name
-- Actual phone name obtained: YES/NO
-- What name was shown: [actual value]
+### Step 1: Disconnect Phone
 
-### Test F: Manual Registration
-- Device linked to student: YES/NO
-- Student name shown correctly: YES/NO
-- Device limit enforced: YES/NO
+1. On your Android phone, turn Wi-Fi OFF
+2. Do NOT reboot the router
+3. Do NOT restart the agent
+
+### Step 2: Observe Behavior
+
+Watch the agent output for several discovery cycles (every 30 seconds):
+
+```
+Cycle 1 (0-30s):   Device count = ___, Status = ___
+Cycle 2 (30-60s):  Device count = ___, Status = ___
+Cycle 3 (60-90s):  Device count = ___, Status = ___
+Cycle 4 (90-120s): Device count = ___, Status = ___
+Cycle 5 (120-150s): Device count = ___, Status = ___
+Cycle 6 (150-180s): Device count = ___, Status = ___
+Cycle 7 (180-210s): Device count = ___, Status = ___
+Cycle 8 (210-240s): Device count = ___, Status = ___
+Cycle 9 (240-270s): Device count = ___, Status = ___
+Cycle 10 (270-300s): Device count = ___, Status = ___
+```
+
+### Step 3: Check Admin Panel
+
+Refresh the Network Devices page and note:
+- When does the device disappear from the list?
+- What is the final status?
+- Does it show as "offline" after 5 minutes?
+
+## PHASE 3C - RECONNECT TEST
+
+### Step 1: Reconnect Phone
+
+1. On your Android phone, turn Wi-Fi ON
+2. Wait for IP assignment
+3. Record the new IP and MAC (they may change)
+
+```
+Reconnection Information:
+├─ New IP Address: _____.___.___.___
+├─ New MAC Address: __:__:__:__:__:__
+└─ MAC Changed: [YES / NO]
+```
+
+### Step 2: Observe Rediscovery
+
+Wait for the next discovery cycle and check:
+- Does the device reappear in the list?
+- Is the IP the same or different?
+- Is the MAC the same or different?
+- Does status return to "online"?
+- Is firstSeen preserved from initial discovery?
+- Does lastSeen update correctly?
+
+## PHASE 3D - PRIVATE MAC BEHAVIOR
+
+### Check MAC Settings
+
+On your Android phone:
+- Settings → Network & Internet → Wi-Fi
+- Tap on network → MAC address type
+
+Record:
+```
+MAC Setting: [Device MAC / Randomized MAC]
+```
+
+If MAC changed between connections:
+- Record both MAC addresses
+- Verify the system created a new device record
+- Verify the old device is marked offline
+
+## PHASE 3E - DEVICE NAME VALIDATION
+
+### Check What Name Was Detected
+
+From the Admin Panel Network Devices page, for your phone device:
+
+```
+Device Name Shown: ___________________
+Hostname Shown: ___________________
+Manufacturer Shown: ___________________
+```
+
+### Expected Results
+
+- **Likely:** Shows "Unknown Device" for Android phones
+- **Reason:** Router DHCP information not available, phones don't broadcast names via DNS/NetBIOS
+- **Manufacturer:** May show Samsung/Xiaomi/etc. from MAC OUI database
+
+### Important
+
+- If the device name is NOT your actual phone name, this is **EXPECTED**
+- The system cannot reliably obtain actual Android device names without router API access
+- Manual device labeling is the solution (see Phase 3F)
+
+## PHASE 3F - MANUAL DEVICE REGISTRATION
+
+### Step 1: Find an Existing Student
+
+Go to Admin Panel → Students and find an existing student to use for testing.
+Record the Student ID.
+
+```
+Test Student ID: _________________
+Test Student Name: _________________
+```
+
+### Step 2: Link Device to Student
+
+1. Go to Admin Panel → Network Devices
+2. Find your phone device
+3. Click the [Link] button
+4. Enter the Student ID
+5. Optionally enter a device label (e.g., "Test Phone")
+6. Click [Link Device]
+
+### Step 3: Verify Registration
+
+Check that:
+- Student name appears in the "Linked Student" column
+- Device label is saved
+- The link is stored in the database
+
+### Step 4: Test Unlink
+
+1. Click the [Unlink] button on the same device
+2. Verify the student name is removed
+3. Verify the device record still exists
+4. Verify the student record is unchanged
+
+## PHASE 3G - DEVICE LIMIT TEST
+
+### Step 1: Check Current Configuration
+
+Default limit: 2 devices per student
+
+### Step 2: Link Multiple Devices
+
+Try to link 3 different devices to the same student:
+- First device: Should succeed
+- Second device: Should succeed
+- Third device: Should be rejected with error message
+
+### Step 3: Verify Error Message
+
+You should see: "Maximum registered devices reached (2)"
+
+## DATA SAFETY VERIFICATION
+
+After all tests, verify:
+
+- [ ] No student data was modified
+- [ ] No admission data was modified
+- [ ] No membership/payment data was modified
+- [ ] No attendance was automatically marked
+- [ ] Device registration only linked existing devices to existing students
+- [ ] No new students were created automatically
+- [ ] Existing NetworkDevice records were not deleted
+
+## FINAL TEST RESULTS
+
+Complete this checklist:
+
+### Phone Detection
+- [ ] Phone detected: YES/NO
+- [ ] Correct IP: YES/NO
+- [ ] Correct MAC: YES/NO
+- [ ] Manufacturer detected: YES/NO
+- [ ] Device name shown: [actual value]
+- [ ] Hostname shown: [actual value]
+- [ ] Status: [actual value]
+
+### Disconnect
+- [ ] Device disappeared from ARP: YES/NO
+- [ ] Device marked offline: YES/NO
+- [ ] Time to offline: [actual time]
+
+### Reconnect
+- [ ] Device reappeared: YES/NO
+- [ ] IP changed: YES/NO
+- [ ] MAC changed: YES/NO
+- [ ] Status returned to online: YES/NO
+
+### Private MAC
+- [ ] Phone using private MAC: YES/NO
+- [ ] MAC changed on reconnect: YES/NO
+
+### Device Name
+- [ ] Actual phone name obtained: YES/NO
+- [ ] What name was shown: [actual value]
+
+### Manual Registration
+- [ ] Device linked to student: YES/NO
+- [ ] Student name shown correctly: YES/NO
+- [ ] Device limit enforced: YES/NO
+- [ ] Unlink worked correctly: YES/NO
+
+## TROUBLESHOOTING
+
+### Agent Not Connecting
+
+If you see "connect ECONNREFUSED":
+- Make sure backend is running: `cd server && npm run dev`
+- Check backend is on port 3000
+- Check BACKEND_URL in local-network-agent/.env
+
+### Device Not Appearing
+
+If your phone doesn't appear:
+- Verify phone is connected to Airtel_Durga_Library
+- Wait for 2-3 discovery cycles (60-90 seconds)
+- Check phone Wi-Fi settings for IP address
+- Compare with device list to find match
+
+### Device Name Shows as "Unknown Device"
+
+This is EXPECTED for Android phones:
+- Router DHCP information not available
+- Phones don't broadcast names via DNS/NetBIOS
+- Use manual device labeling as solution
