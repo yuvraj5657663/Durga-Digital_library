@@ -1,9 +1,11 @@
 import express from 'express';
 import { validate } from '../middlewares/validationMiddleware.js';
 import { networkAuthSchema } from '../validators/networkValidator.js';
+import { networkAgentAuth } from '../middlewares/networkAgentMiddleware.js';
 import * as networkController from '../controllers/networkController.js';
 import * as wifiSessionController from '../controllers/wifiSessionController.js';
 import * as captivePortalController from '../controllers/captivePortalController.js';
+import * as networkDeviceController from '../controllers/networkDeviceController.js';
 
 const router = express.Router();
 
@@ -21,5 +23,8 @@ router.get('/portal', captivePortalController.portalEntryController);
 router.post('/portal/authenticate', captivePortalController.portalAuthenticateController);
 router.post('/portal/logout', captivePortalController.portalLogoutController);
 router.get('/portal/status/:portalSessionId', captivePortalController.portalStatusController);
+
+// Network Agent endpoints (for local discovery agent)
+router.post('/agent/devices', networkAgentAuth, networkDeviceController.receiveAgentDevicesController);
 
 export default router;

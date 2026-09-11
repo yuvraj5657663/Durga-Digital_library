@@ -72,6 +72,7 @@ export const config = {
   wifi: {
     maxDevicesPerStudent: parseInt(process.env.MAX_WIFI_DEVICES_PER_STUDENT, 10) || 2,
     sessionDurationMinutes: parseInt(process.env.WIFI_SESSION_DURATION_MINUTES, 10) || 720,
+    maxRegisteredNetworkDevicesPerStudent: parseInt(process.env.MAX_REGISTERED_NETWORK_DEVICES_PER_STUDENT, 10) || 2,
   },
 
   network: {
@@ -97,6 +98,11 @@ export const config = {
       radiusHost: process.env.NETWORK_GATEWAY_RADIUS_HOST || null,
       radiusPort: process.env.NETWORK_GATEWAY_RADIUS_PORT || null,
       radiusSecret: process.env.NETWORK_GATEWAY_RADIUS_SECRET || null
+    },
+    agent: {
+      id: process.env.NETWORK_AGENT_ID || null,
+      secret: process.env.NETWORK_AGENT_SECRET || null,
+      deviceOfflineMinutes: parseInt(process.env.NETWORK_AGENT_DEVICE_OFFLINE_MINUTES, 10) || 5
     }
   },
 };

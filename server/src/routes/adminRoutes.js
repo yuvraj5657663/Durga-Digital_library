@@ -14,6 +14,8 @@ import * as deviceController from '../controllers/deviceController.js';
 import * as wifiSessionController from '../controllers/wifiSessionController.js';
 import * as captivePortalController from '../controllers/captivePortalController.js';
 import * as adminAnalyticsController from '../controllers/adminAnalyticsController.js';
+import * as networkDeviceController from '../controllers/networkDeviceController.js';
+import * as registeredNetworkDeviceController from '../controllers/registeredNetworkDeviceController.js';
 import { SHIFT_CONFIG } from '../config/shiftConfig.js';
 import Seat from '../models/Seat.js';
 
@@ -167,5 +169,14 @@ router.post('/network/portal/sessions/:portalSessionId/expire', requirePermissio
 router.get('/network/gateway/status', requirePermission('WIFI_VIEW'), captivePortalController.gatewayDiagnosticsController);
 router.get('/network/gateway/readiness', requirePermission('WIFI_VIEW'), captivePortalController.gatewayReadinessController);
 router.get('/network/gateway/health', requirePermission('WIFI_VIEW'), captivePortalController.gatewayHealthController);
+
+// ── Network Device Discovery ───────────────────────────────────────────────────────
+router.get('/network/devices', requirePermission('WIFI_VIEW'), networkDeviceController.getNetworkDevicesController);
+
+// ── Registered Network Devices ─────────────────────────────────────────────────────
+router.post('/network/devices/:networkDeviceId/link', requirePermission('WIFI_MANAGE'), registeredNetworkDeviceController.linkDeviceController);
+router.delete('/network/devices/:networkDeviceId/link', requirePermission('WIFI_MANAGE'), registeredNetworkDeviceController.unlinkDeviceController);
+router.get('/network/devices/:networkDeviceId/student', requirePermission('WIFI_VIEW'), registeredNetworkDeviceController.getDeviceStudentInfoController);
+router.get('/network/registered-devices', requirePermission('WIFI_VIEW'), registeredNetworkDeviceController.getAllRegisteredDevicesController);
 
 export default router;

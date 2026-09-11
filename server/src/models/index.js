@@ -14,6 +14,8 @@ import AdmissionInquiry from './AdmissionInquiry.js';
 import RegisteredDevice from './RegisteredDevice.js';
 import WiFiSession from './WiFiSession.js';
 import CaptivePortalSession from './CaptivePortalSession.js';
+import NetworkDevice from './NetworkDevice.js';
+import RegisteredNetworkDevice from './RegisteredNetworkDevice.js';
 
 export {
   User,
@@ -31,5 +33,7 @@ export {
   AdmissionInquiry,
   RegisteredDevice,
   WiFiSession,
-  CaptivePortalSession
+  CaptivePortalSession,
+  NetworkDevice,
+  RegisteredNetworkDevice
 };
