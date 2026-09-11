@@ -120,6 +120,12 @@ Discovery Results:
 └─ Last Seen: ___________________
 ```
 
+**Status Explanation:**
+- **Online:** Device responded to ping (highest confidence)
+- **Recently Seen:** Device in ARP but didn't respond to ping (likely connected, ignoring ICMP)
+- **Unreachable:** Enrichment failed (edge case)
+- **Offline:** Not seen for >5 minutes
+
 ## PHASE 3B - DISCONNECT TEST
 
 ### Step 1: Disconnect Phone
@@ -173,7 +179,7 @@ Wait for the next discovery cycle and check:
 - Does the device reappear in the list?
 - Is the IP the same or different?
 - Is the MAC the same or different?
-- Does status return to "online"?
+- Does status return to "online" or "recently_seen"?
 - Is firstSeen preserved from initial discovery?
 - Does lastSeen update correctly?
 
@@ -305,7 +311,7 @@ Complete this checklist:
 - [ ] Device reappeared: YES/NO
 - [ ] IP changed: YES/NO
 - [ ] MAC changed: YES/NO
-- [ ] Status returned to online: YES/NO
+- [ ] Status returned to online/recently_seen: YES/NO
 
 ### Private MAC
 - [ ] Phone using private MAC: YES/NO
@@ -344,3 +350,11 @@ This is EXPECTED for Android phones:
 - Router DHCP information not available
 - Phones don't broadcast names via DNS/NetBIOS
 - Use manual device labeling as solution
+
+### Status Shows "Recently Seen" Instead of "Online"
+
+This is EXPECTED if the phone ignores ICMP ping:
+- "Recently Seen" means device is in ARP but didn't respond to ping
+- This is normal for many Android/iPhone devices
+- The device is likely still connected to Wi-Fi
+- This is more accurate than marking it "unreachable"

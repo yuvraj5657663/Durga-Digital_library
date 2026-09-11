@@ -16,6 +16,7 @@ import WiFiSession from './WiFiSession.js';
 import CaptivePortalSession from './CaptivePortalSession.js';
 import NetworkDevice from './NetworkDevice.js';
 import RegisteredNetworkDevice from './RegisteredNetworkDevice.js';
+import AgentNonce from './AgentNonce.js';
 
 export {
   User,
@@ -35,5 +36,6 @@ export {
   WiFiSession,
   CaptivePortalSession,
   NetworkDevice,
-  RegisteredNetworkDevice
+  RegisteredNetworkDevice,
+  AgentNonce
 };

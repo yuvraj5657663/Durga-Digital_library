@@ -21,7 +21,7 @@ const networkDeviceSchema = new mongoose.Schema(
     
     status: {
       type: String,
-      enum: ['online', 'unreachable', 'offline'],
+      enum: ['online', 'recently_seen', 'unreachable', 'offline'],
       default: 'online',
       index: true
     },

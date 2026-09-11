@@ -42,7 +42,7 @@ async function processAgentDevices(agentId, devices) {
           existing.deviceName = deviceData.deviceName || existing.deviceName;
           existing.hostname = deviceData.hostname || existing.hostname;
           existing.manufacturer = deviceData.manufacturer || existing.manufacturer;
-          // Preserve the status from agent (online or unreachable)
+          // Preserve the status from agent (online, recently_seen, or unreachable)
           existing.status = deviceData.status || 'unreachable';
           existing.lastSeen = deviceData.lastSeen || now;
           existing.lastSeenAt = now;

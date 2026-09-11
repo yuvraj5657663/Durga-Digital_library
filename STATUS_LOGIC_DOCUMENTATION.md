@@ -4,19 +4,28 @@
 
 ### ONLINE
 - **Definition:** Device is in ARP table AND responds to ping (ICMP echo)
-- **Agent Logic:** `isReachable ? 'online' : 'unreachable'`
+- **Agent Logic:** `isReachable ? 'online' : 'recently_seen'`
 - **Evidence:**
   - Recent ARP observation (device in current ARP table)
   - Successful ping response (ICMP echo)
   - lastSeenAt updated on each discovery cycle
 
-### UNREACHABLE
+### RECENTLY_SEEN
 - **Definition:** Device is in ARP table BUT does NOT respond to ping
-- **Agent Logic:** `isReachable ? 'online' : 'unreachable'`
+- **Agent Logic:** `isReachable ? 'online' : 'recently_seen'`
 - **Evidence:**
   - Recent ARP observation (device in current ARP table)
   - Ping timeout or failure
   - Device may be connected to Wi-Fi but ignoring ICMP
+  - lastSeenAt updated on each discovery cycle
+- **Important:** This status distinguishes devices that are likely connected but not responding to ping from truly unreachable devices
+
+### UNREACHABLE
+- **Definition:** Device was not reachable during enrichment failure
+- **Agent Logic:** Used as fallback when enrichment fails
+- **Evidence:**
+  - Device in ARP table
+  - Enrichment process failed (error handling)
   - lastSeenAt updated on each discovery cycle
 
 ### OFFLINE
@@ -36,13 +45,13 @@
 const isReachable = await isDeviceReachable(device.ipAddress);
 
 // Set status based on ping result
-status: isReachable ? 'online' : 'unreachable'
+status: isReachable ? 'online' : 'recently_seen'
 ```
 
 ### Backend Side (server/src/services/networkDeviceService.js)
 
 ```javascript
-// Preserve the status from agent (online or unreachable)
+// Preserve the status from agent (online, recently_seen, or unreachable)
 existing.status = deviceData.status || 'unreachable';
 
 // Mark unseen devices as offline after threshold
@@ -51,55 +60,88 @@ if (device.lastSeenAt < offlineThreshold) {
 }
 ```
 
+## Rationale for RECENTLY_SEEN Status
+
+### Problem
+- Android/iPhone devices often ignore ICMP ping while still being connected to Wi-Fi
+- Without "recently_seen" status, these devices would be marked "unreachable"
+- "Unreachable" implies the device is not connected, which is misleading
+
+### Solution
+- Added "recently_seen" status to distinguish:
+  - Devices in ARP but not pingable (likely connected, ignoring ICMP)
+  - Devices not in ARP at all (truly offline)
+- This provides more accurate information to admins
+
+### Status Hierarchy
+1. **ONLINE:** ARP + ping success (highest confidence)
+2. **RECENTLY_SEEN:** ARP + ping failure (still in network, likely connected)
+3. **UNREACHABLE:** Enrichment failure (edge case)
+4. **OFFLINE:** Not in ARP for >5 minutes (truly gone)
+
 ## Known Limitations
 
 ### 1. Ping-Only Online Detection
 **Issue:** Phones can ignore ICMP ping while still being connected to Wi-Fi
-**Impact:** Device may be marked "unreachable" even though it's actually connected
-**Current Behavior:** Requires ping success for "online" status
-**Future Improvement:** Consider adding "recently_seen" status for devices in ARP but not pingable
+**Impact:** Device marked "recently_seen" instead of "online"
+**Mitigation:** "recently_seen" status now distinguishes this from truly offline devices
+**Future Improvement:** Consider adding UDP/TCP reachability probes if ICMP consistently fails
 
 ### 2. ARP Cache Persistence
 **Issue:** ARP table may persist for several minutes after disconnect
 **Impact:** Device may appear in ARP even after disconnect
 **Mitigation:** Backend marks offline after 5 minutes of no updates (not just one missing ARP entry)
 
-### 3. No "Recently Seen" Status
-**Issue:** Current implementation only has online/unreachable/offline
-**Impact:** Cannot distinguish between "seen in ARP but not pingable" and "not seen recently"
-**Future Improvement:** Add "recently_seen" status for devices in ARP but not responding to ping
-
-## Recommended Status Logic (For Future Enhancement)
-
-```javascript
-ONLINE:
-- Device in current ARP table
-- AND (ping succeeds OR ping not available)
-- AND lastSeenAt < 1 minute ago
-
-RECENTLY_SEEN:
-- Device in current ARP table
-- AND ping fails
-- AND lastSeenAt < 5 minutes ago
-
-UNREACHABLE:
-- Device in current ARP table
-- AND ping fails
-- AND lastSeenAt < 1 minute ago
-
-OFFLINE:
-- Device not in recent ARP table
-- OR lastSeenAt > 5 minutes ago
-```
+### 3. ICMP vs Actual Connectivity
+**Issue:** ICMP blocking on some devices
+**Impact:** Cannot definitively determine if device is actually connected
+**Mitigation:** "recently_seen" status acknowledges this limitation
 
 ## Current Status for Production
 
-The current implementation is **adequate for initial deployment** but has known limitations:
+The current implementation is **adequate for initial deployment** with improved accuracy:
 
-- ✅ Distinguishes between reachable and unreachable devices
-- ✅ Marks devices offline after inactivity
+- ✅ Distinguishes between reachable and recently-seen devices
+- ✅ Distinguishes between recently-seen and truly offline devices
 - ✅ Uses multiple signals (ARP + ping + lastSeenAt)
-- ⚠️ May mark devices as "unreachable" even if they're connected (ping limitation)
-- ⚠️ No "recently_seen" status for devices that don't respond to ping
+- ✅ Handles devices that ignore ICMP gracefully
+- ✅ Clear status hierarchy for admins
 
 **Recommendation:** Proceed with current implementation for Phase 4, gather real phone test data, and refine status logic in Phase 5 based on actual phone behavior.
+
+## Replay Protection (NEW)
+
+### Implementation
+- Added nonce/requestId to HMAC signature
+- Nonce is random 16-byte hex string (32 characters)
+- Backend stores used nonces in MongoDB with 5-minute TTL
+- Duplicate nonces are rejected as replay attacks
+
+### Authentication Header Format
+```
+X-Agent-Auth: agentId:timestamp:nonce:signature
+```
+
+### Signature Calculation
+```javascript
+const canonicalString = `${agentId}:${timestamp}:${nonce}`;
+const signature = crypto.createHmac('sha256', secret).update(canonicalString).digest('hex');
+```
+
+### Validation Steps
+1. Parse agentId, timestamp, nonce, signature
+2. Validate agentId matches configured value
+3. Validate timestamp is within ±60 seconds
+4. Validate nonce length (16-64 characters)
+5. Check if nonce was already used (replay protection)
+6. Store nonce in MongoDB with 5-minute TTL
+7. Validate HMAC signature matches canonical string
+8. Validate request body structure and size
+9. Validate all IPs are in private range
+
+### Security Benefits
+- ✅ Prevents replay attacks within 60-second window
+- ✅ Bounded storage (nonces auto-expire after 5 minutes)
+- ✅ Deterministic canonical signature
+- ✅ No unlimited nonce storage
+- ✅ Fails safe on duplicate nonce detection

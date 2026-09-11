@@ -242,16 +242,24 @@ function getManufacturerFromMac(macAddress) {
 }
 
 /**
- * Generate authentication header
+ * Generate a random nonce for replay protection
+ */
+function generateNonce() {
+  return crypto.randomBytes(16).toString('hex');
+}
+
+/**
+ * Generate authentication header with nonce for replay protection
  */
 function generateAuthHeader() {
   const timestamp = Date.now().toString();
+  const nonce = generateNonce();
   const signature = crypto
     .createHmac('sha256', config.agentSecret)
-    .update(`${config.agentId}:${timestamp}`)
+    .update(`${config.agentId}:${timestamp}:${nonce}`)
     .digest('hex');
 
-  return `${config.agentId}:${timestamp}:${signature}`;
+  return `${config.agentId}:${timestamp}:${nonce}:${signature}`;
 }
 
 /**
@@ -340,7 +348,7 @@ async function discoverAndSend() {
           macAddress: device.macAddress,
           manufacturer: manufacturer || '',
           source: 'arp_scan',
-          status: isReachable ? 'online' : 'unreachable',
+          status: isReachable ? 'online' : 'recently_seen',
           firstSeen: new Date().toISOString(),
           lastSeen: new Date().toISOString()
         });

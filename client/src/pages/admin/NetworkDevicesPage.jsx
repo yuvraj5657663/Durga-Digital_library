@@ -6,6 +6,7 @@ import axios from 'axios';
 
 const STATUS_STYLES = {
   online: 'bg-green-100 text-green-700',
+  recently_seen: 'bg-blue-100 text-blue-700',
   unreachable: 'bg-yellow-100 text-yellow-700',
   offline: 'bg-gray-100 text-gray-600'
 };
@@ -48,6 +49,7 @@ function formatTimeAgo(value) {
 function StatusBadge({ status }) {
   const statusLabels = {
     online: 'Online',
+    recently_seen: 'Recently Seen',
     unreachable: 'Unreachable',
     offline: 'Offline'
   };
@@ -101,6 +103,7 @@ export default function NetworkDevicesPage() {
   const devices = data?.data?.devices || [];
   const agentHeartbeat = data?.data?.agentHeartbeat;
   const onlineCount = devices.filter((d) => d.status === 'online').length;
+  const recentlySeenCount = devices.filter((d) => d.status === 'recently_seen').length;
   const unreachableCount = devices.filter((d) => d.status === 'unreachable').length;
 
   const agentStatus = agentHeartbeat?.status || 'unknown';
@@ -155,6 +158,12 @@ export default function NetworkDevicesPage() {
             <Wifi className="w-4 h-4 text-green-600" />
             {onlineCount} online
           </div>
+          {recentlySeenCount > 0 && (
+            <div className="flex items-center gap-2 text-sm text-blue-600">
+              <AlertCircle className="w-4 h-4" />
+              {recentlySeenCount} recently seen
+            </div>
+          )}
           {unreachableCount > 0 && (
             <div className="flex items-center gap-2 text-sm text-yellow-600">
               <AlertCircle className="w-4 h-4" />
@@ -179,6 +188,7 @@ export default function NetworkDevicesPage() {
         <select className="input w-40 text-sm" value={status} onChange={(e) => setStatus(e.target.value)}>
           <option value="">All devices</option>
           <option value="online">Online only</option>
+          <option value="recently_seen">Recently Seen</option>
           <option value="unreachable">Unreachable only</option>
           <option value="offline">Offline only</option>
         </select>

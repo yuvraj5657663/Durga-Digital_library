@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import config from '../config/index.js';
 import { AuthenticationError, ValidationError } from '../utils/errors.js';
+import AgentNonce from '../models/AgentNonce.js';
 
 /**
  * Validate IP address is in private/local range
@@ -38,9 +39,14 @@ export const networkAgentAuth = async (req, res, next) => {
       throw new AuthenticationError('Network agent not configured on server');
     }
 
-    const [agentId, timestamp, signature] = authHeader.split(':');
+    // Reject development secret in production
+    if (expectedAgentSecret === 'test-secret-key-for-development-only') {
+      throw new AuthenticationError('Development secret detected. Production requires a strong random secret.');
+    }
 
-    if (!agentId || !timestamp || !signature) {
+    const [agentId, timestamp, nonce, signature] = authHeader.split(':');
+
+    if (!agentId || !timestamp || !nonce || !signature) {
       throw new AuthenticationError('Invalid agent authentication format');
     }
 
@@ -60,9 +66,30 @@ export const networkAgentAuth = async (req, res, next) => {
       throw new AuthenticationError('Agent authentication timestamp in future');
     }
 
+    // Check nonce validity
+    if (nonce.length < 16 || nonce.length > 64) {
+      throw new AuthenticationError('Invalid nonce length');
+    }
+
+    // Check if nonce was already used (replay protection)
+    const existingNonce = await AgentNonce.findOne({ agentId, nonce });
+    if (existingNonce) {
+      throw new AuthenticationError('Nonce already used - possible replay attack');
+    }
+
+    // Store nonce to prevent reuse
+    await AgentNonce.create({
+      agentId,
+      nonce,
+      usedAt: new Date()
+    });
+
+    // Create canonical signature string
+    const canonicalString = `${agentId}:${timestamp}:${nonce}`;
+
     const expectedSignature = crypto
       .createHmac('sha256', expectedAgentSecret)
-      .update(`${agentId}:${timestamp}`)
+      .update(canonicalString)
       .digest('hex');
 
     if (signature !== expectedSignature) {
