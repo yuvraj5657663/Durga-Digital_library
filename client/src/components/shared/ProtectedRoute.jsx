@@ -1,6 +1,8 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
+const STAFF_ROLES = ['admin', 'SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF', 'ACCOUNTANT', 'LIBRARIAN', 'SUPPORT'];
+
 const ProtectedRoute = ({ children, requiredRole }) => {
   const { isAuthenticated, isAdmin, isStudent, loading, user } = useAuth();
 
@@ -30,7 +32,7 @@ const ProtectedRoute = ({ children, requiredRole }) => {
 
   if (requiredRole === 'student' && !isStudent) {
     // Admin trying to access student routes
-    if (isAdmin) {
+    if (STAFF_ROLES.includes(user?.role)) {
       return <Navigate to="/admin" replace />;
     }
     return <Navigate to="/login" replace />;

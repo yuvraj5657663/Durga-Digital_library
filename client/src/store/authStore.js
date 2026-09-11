@@ -19,6 +19,9 @@ import {
   broadcastLogout,
 } from '../utils/tokenStorage';
 
+// Staff roles that should be treated as 'admin' for token storage
+const STAFF_ROLES = ['admin', 'SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF', 'ACCOUNTANT', 'LIBRARIAN', 'SUPPORT'];
+
 export const useAuthStore = create((set, get) => ({
   // ── Initial hydration from role-scoped storage ────────────────────────────
   // `getUser()` + `getAccessToken()` resolve the active role from sessionStorage
@@ -41,8 +44,10 @@ export const useAuthStore = create((set, get) => ({
       console.error('[authStore] setAuth: user has no role — cannot scope storage');
       return;
     }
+    // Normalize staff roles to 'admin' for storage
+    const normalizedRole = STAFF_ROLES.includes(role) ? 'admin' : role;
     // Persist to role-scoped localStorage
-    saveSession({ role, accessToken, refreshToken, user });
+    saveSession({ role: normalizedRole, accessToken, refreshToken, user });
 
     // Update Zustand state
     set({ user, accessToken, refreshToken, isAuthenticated: true });
@@ -54,8 +59,9 @@ export const useAuthStore = create((set, get) => ({
    */
   logout: () => {
     const role = get().user?.role || null;
-    clearSession(role);
-    broadcastLogout(role);
+    const normalizedRole = role && STAFF_ROLES.includes(role) ? 'admin' : role;
+    clearSession(normalizedRole);
+    broadcastLogout(normalizedRole);
     set({
       user:            null,
       accessToken:     null,
@@ -69,12 +75,13 @@ export const useAuthStore = create((set, get) => ({
    * Merges the supplied fields into both storage and Zustand state.
    */
   updateUser: (userData) => {
-    const role    = get().user?.role;
-    const merged  = tsUpdateUser(userData, role);  // updates localStorage
+    const role = get().user?.role;
+    const normalizedRole = role && STAFF_ROLES.includes(role) ? 'admin' : role;
+    const merged  = tsUpdateUser(userData, normalizedRole);  // updates localStorage
     set({ user: merged });
   },
 
   // ── Convenience selectors (stable references — safe in useSelector) ───────
-  isAdmin:   () => get().user?.role === 'admin',
+  isAdmin:   () => STAFF_ROLES.includes(get().user?.role),
   isStudent: () => get().user?.role === 'student',
 }));

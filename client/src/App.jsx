@@ -6,8 +6,10 @@ import LandingPage from './pages/LandingPage';
 import AdminLayout from './components/admin/AdminLayout';
 import StudentLayout from './components/student/StudentLayout';
 
+const STAFF_ROLES = ['admin', 'SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF', 'ACCOUNTANT', 'LIBRARIAN', 'SUPPORT'];
+
 function AppRoutes() {
-  const { isAuthenticated, loading, isAdmin } = useAuth();
+  const { isAuthenticated, loading, isAdmin, user } = useAuth();
 
   // Show loading spinner while checking auth
   if (loading) {
@@ -52,7 +54,7 @@ function AppRoutes() {
         path="/dashboard"
         element={
           isAuthenticated ? (
-            <Navigate to={isAdmin ? '/admin' : '/student'} replace />
+            <Navigate to={STAFF_ROLES.includes(user?.role) ? '/admin' : '/student'} replace />
           ) : (
             <Navigate to="/" replace />
           )

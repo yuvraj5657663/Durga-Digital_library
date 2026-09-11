@@ -31,7 +31,7 @@ import {
 } from '../utils/tokenStorage';
 
 const AuthContext = createContext(undefined);
-const STAFF_ROLES = new Set(['admin', 'SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF', 'ACCOUNTANT', 'LIBRARIAN', 'SUPPORT']);
+const STAFF_ROLES = ['admin', 'SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF', 'ACCOUNTANT', 'LIBRARIAN', 'SUPPORT'];
 
 export const AuthProvider = ({ children }) => {
   const { user, isAuthenticated, setAuth, logout, updateUser } = useAuthStore();
@@ -142,7 +142,7 @@ export const AuthProvider = ({ children }) => {
     login,
     logout:    handleLogout,
     updateUser,
-    isAdmin:   STAFF_ROLES.has(user?.role),
+    isAdmin:   STAFF_ROLES.includes(user?.role),
     isStudent: user?.role === 'student',
   };
 

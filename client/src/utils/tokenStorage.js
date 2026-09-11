@@ -26,6 +26,9 @@
 
 const NS = 'ddl';
 
+// Staff roles that should be treated as 'admin' for token storage
+const STAFF_ROLES = ['admin', 'SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF', 'ACCOUNTANT', 'LIBRARIAN', 'SUPPORT'];
+
 /* ── JWT payload decode (no signature verify — client-side only) ─────────── */
 function decodeJwtPayload(token) {
   try {
@@ -39,7 +42,14 @@ function decodeJwtPayload(token) {
 function getRoleFromToken(token) {
   if (!token) return null;
   const payload = decodeJwtPayload(token);
-  return payload?.role || null;  // 'admin' | 'student'
+  const role = payload?.role || null;
+  
+  // Normalize staff roles to 'admin' for storage
+  if (role && STAFF_ROLES.includes(role)) {
+    return 'admin';
+  }
+  
+  return role === 'student' ? 'student' : null;
 }
 
 /* ── Determine active role for this tab ──────────────────────────────────── */
@@ -62,7 +72,8 @@ export function getActiveRole() {
     const token = localStorage.getItem(`${NS}.${role}.accessToken`);
     if (token) {
       const decoded = decodeJwtPayload(token);
-      if (decoded?.role === role) {
+      const normalizedRole = getRoleFromToken(token);
+      if (normalizedRole === role) {
         // Persist in sessionStorage so subsequent reads are O(1)
         sessionStorage.setItem(`${NS}.role`, role);
         return role;
@@ -88,19 +99,27 @@ function key(role, field) {
 /** Save a full auth session (tokens + user) for a given role. */
 export function saveSession({ role, accessToken, refreshToken, user }) {
   if (!role) throw new Error('[tokenStorage] role is required');
-  localStorage.setItem(key(role, 'accessToken'),  accessToken);
-  localStorage.setItem(key(role, 'refreshToken'), refreshToken);
-  localStorage.setItem(key(role, 'user'),         JSON.stringify(user));
-  setActiveRole(role);
+  
+  // Normalize staff roles to 'admin' for storage
+  const normalizedRole = STAFF_ROLES.includes(role) ? 'admin' : role;
+  
+  localStorage.setItem(key(normalizedRole, 'accessToken'),  accessToken);
+  localStorage.setItem(key(normalizedRole, 'refreshToken'), refreshToken);
+  localStorage.setItem(key(normalizedRole, 'user'),         JSON.stringify(user));
+  setActiveRole(normalizedRole);
 }
 
 /** Clear the stored session for a given role (or the current tab's role). */
 export function clearSession(role) {
   const r = role || getActiveRole();
   if (!r) return;
-  localStorage.removeItem(key(r, 'accessToken'));
-  localStorage.removeItem(key(r, 'refreshToken'));
-  localStorage.removeItem(key(r, 'user'));
+  
+  // Normalize staff roles to 'admin' for storage
+  const normalizedRole = STAFF_ROLES.includes(r) ? 'admin' : r;
+  
+  localStorage.removeItem(key(normalizedRole, 'accessToken'));
+  localStorage.removeItem(key(normalizedRole, 'refreshToken'));
+  localStorage.removeItem(key(normalizedRole, 'user'));
   setActiveRole(null);
 }
 
@@ -108,22 +127,34 @@ export function clearSession(role) {
 export function getAccessToken(role) {
   const r = role || getActiveRole();
   if (!r) return null;
-  return localStorage.getItem(key(r, 'accessToken'));
+  
+  // Normalize staff roles to 'admin' for storage
+  const normalizedRole = STAFF_ROLES.includes(r) ? 'admin' : r;
+  
+  return localStorage.getItem(key(normalizedRole, 'accessToken'));
 }
 
 /** Read the refresh token for the current tab's active role. */
 export function getRefreshToken(role) {
   const r = role || getActiveRole();
   if (!r) return null;
-  return localStorage.getItem(key(r, 'refreshToken'));
+  
+  // Normalize staff roles to 'admin' for storage
+  const normalizedRole = STAFF_ROLES.includes(r) ? 'admin' : r;
+  
+  return localStorage.getItem(key(normalizedRole, 'refreshToken'));
 }
 
 /** Read the stored user object for the current tab's active role. */
 export function getUser(role) {
   const r = role || getActiveRole();
   if (!r) return null;
+  
+  // Normalize staff roles to 'admin' for storage
+  const normalizedRole = STAFF_ROLES.includes(r) ? 'admin' : r;
+  
   try {
-    return JSON.parse(localStorage.getItem(key(r, 'user')));
+    return JSON.parse(localStorage.getItem(key(normalizedRole, 'user')));
   } catch {
     return null;
   }
@@ -133,23 +164,35 @@ export function getUser(role) {
 export function setAccessToken(accessToken, role) {
   const r = role || getActiveRole();
   if (!r) return;
-  localStorage.setItem(key(r, 'accessToken'), accessToken);
+  
+  // Normalize staff roles to 'admin' for storage
+  const normalizedRole = STAFF_ROLES.includes(r) ? 'admin' : r;
+  
+  localStorage.setItem(key(normalizedRole, 'accessToken'), accessToken);
 }
 
 /** Write a new refresh token (rotation). */
 export function setRefreshToken(refreshToken, role) {
   const r = role || getActiveRole();
   if (!r) return;
-  localStorage.setItem(key(r, 'refreshToken'), refreshToken);
+  
+  // Normalize staff roles to 'admin' for storage
+  const normalizedRole = STAFF_ROLES.includes(r) ? 'admin' : r;
+  
+  localStorage.setItem(key(normalizedRole, 'refreshToken'), refreshToken);
 }
 
 /** Update only the stored user object (e.g. after profile edit). */
 export function updateUser(userData, role) {
   const r = role || getActiveRole();
   if (!r) return;
-  const current = getUser(r) || {};
+  
+  // Normalize staff roles to 'admin' for storage
+  const normalizedRole = STAFF_ROLES.includes(r) ? 'admin' : r;
+  
+  const current = getUser(normalizedRole) || {};
   const merged  = { ...current, ...userData };
-  localStorage.setItem(key(r, 'user'), JSON.stringify(merged));
+  localStorage.setItem(key(normalizedRole, 'user'), JSON.stringify(merged));
   return merged;
 }
 
@@ -162,7 +205,9 @@ export function hasAnySession() {
     const token = localStorage.getItem(key(role, 'accessToken'));
     if (!token) continue;
     const payload = decodeJwtPayload(token);
-    if (payload?.exp && payload.exp * 1000 > Date.now()) return true;
+    // Check if token is for this role (normalized)
+    const normalizedRole = getRoleFromToken(token);
+    if (normalizedRole === role && payload?.exp && payload.exp * 1000 > Date.now()) return true;
   }
   return false;
 }

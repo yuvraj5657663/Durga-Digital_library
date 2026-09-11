@@ -13,6 +13,9 @@ import {
   broadcastLogout,
 } from '../utils/tokenStorage';
 
+// Staff roles that should be treated as 'admin' for token storage
+const STAFF_ROLES = ['admin', 'SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF', 'ACCOUNTANT', 'LIBRARIAN', 'SUPPORT'];
+
 export const authService = {
   /**
    * Authenticate and persist the session under the role-scoped key.
@@ -26,8 +29,8 @@ export const authService = {
       throw new Error('Invalid login response — no token or user received.');
     }
 
-    // Role comes from the server response; never trust the client to decide
-    const role = user.role;  // 'admin' | 'student'
+    // Role comes from the server response; normalize staff roles to 'admin'
+    const role = STAFF_ROLES.includes(user.role) ? 'admin' : user.role;
     saveSession({ role, accessToken, refreshToken, user });
 
     return user;
@@ -45,8 +48,9 @@ export const authService = {
       // Server-side logout failure is non-fatal
     } finally {
       const role = user?.role || null;
-      clearSession(role);
-      broadcastLogout(role);
+      const normalizedRole = role && STAFF_ROLES.includes(role) ? 'admin' : role;
+      clearSession(normalizedRole);
+      broadcastLogout(normalizedRole);
     }
   },
 

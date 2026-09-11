@@ -19,6 +19,9 @@ import {
   getActiveRole,
 } from '../utils/tokenStorage';
 
+// Staff roles that should be treated as 'admin' for token storage
+const STAFF_ROLES = ['admin', 'SUPER_ADMIN', 'ADMIN', 'MANAGER', 'STAFF', 'ACCOUNTANT', 'LIBRARIAN', 'SUPPORT'];
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
 
 const api = axios.create({
@@ -57,8 +60,9 @@ function notifyRefreshSubscribers(newToken) {
 
 function forceLogout() {
   const role = getActiveRole();   // get current role before clearing
-  clearSession(role);             // clears scoped keys + sessionStorage role
-  broadcastLogout(role);          // tell other tabs
+  const normalizedRole = role && STAFF_ROLES.includes(role) ? 'admin' : role;
+  clearSession(normalizedRole);   // clears scoped keys + sessionStorage role
+  broadcastLogout(normalizedRole); // tell other tabs
   window.location.href = '/login';
 }
 
@@ -109,8 +113,10 @@ api.interceptors.response.use(
         response.data.data || response.data;
 
       // Persist new tokens in role-scoped keys
-      setAccessToken(newAccess);
-      setRefreshToken(newRefresh);
+      const currentRole = getActiveRole();
+      const normalizedRole = currentRole && STAFF_ROLES.includes(currentRole) ? 'admin' : currentRole;
+      setAccessToken(newAccess, normalizedRole);
+      setRefreshToken(newRefresh, normalizedRole);
 
       // Retry the original request with the new token
       originalRequest.headers.Authorization = `Bearer ${newAccess}`;
@@ -124,7 +130,7 @@ api.interceptors.response.use(
       forceLogout();
       return Promise.reject(refreshError);
 
-    } finally {
+    } finally {    
       isRefreshing = false;
     }
   }
