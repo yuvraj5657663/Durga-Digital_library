@@ -222,9 +222,68 @@ async function cleanupOldDevices(daysOld = 7) {
   }
 }
 
+/**
+ * Get device summary statistics
+ */
+async function getDeviceSummary() {
+  try {
+    const now = new Date();
+    const recentlySeenThreshold = new Date(now.getTime() - 5 * 60 * 1000); // 5 minutes
+    const offlineThreshold = new Date(now.getTime() - config.network.agent.deviceOfflineMinutes * 60 * 1000);
+
+    // Get all devices
+    const allDevices = await NetworkDevice.find({});
+
+    // Count by status
+    const onlineCount = allDevices.filter(d => d.status === 'online').length;
+    const recentlySeenCount = allDevices.filter(d => d.status === 'recently_seen').length;
+    const unreachableCount = allDevices.filter(d => d.status === 'unreachable').length;
+    const offlineCount = allDevices.filter(d => d.status === 'offline').length;
+
+    // Count currently connected (online + recently_seen)
+    const currentlyConnected = onlineCount + recentlySeenCount;
+
+    // Get student linking information
+    const networkDeviceIds = allDevices.map(d => d._id);
+    const registeredDevices = await RegisteredNetworkDevice.find({
+      networkDeviceId: { $in: networkDeviceIds },
+      status: 'active',
+      enabled: true
+    });
+
+    const linkedStudentCount = registeredDevices.length;
+    const linkedDeviceIds = new Set(registeredDevices.map(rd => rd.networkDeviceId.toString()));
+    const unlinkedDeviceCount = networkDeviceIds.length - linkedDeviceIds.size;
+
+    const summary = {
+      total: allDevices.length,
+      online: onlineCount,
+      recentlySeen: recentlySeenCount,
+      unreachable: unreachableCount,
+      offline: offlineCount,
+      currentlyConnected,
+      linkedStudents: linkedStudentCount,
+      unlinkedDevices: unlinkedDeviceCount
+    };
+
+    return {
+      success: true,
+      summary
+    };
+  } catch (error) {
+    logger.error('[networkDeviceService] Get summary error:', error.message);
+    return {
+      success: false,
+      error: error.message,
+      summary: null
+    };
+  }
+}
+
 export {
   processAgentDevices,
   getDevicesForAdmin,
   getAgentHeartbeat,
-  cleanupOldDevices
+  cleanupOldDevices,
+  getDeviceSummary
 };

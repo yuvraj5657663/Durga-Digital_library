@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 
 const registeredNetworkDeviceSchema = new mongoose.Schema(
   {
-    networkDeviceId: { type: mongoose.Schema.Types.ObjectId, ref: 'NetworkDevice', required: true, index: true },
+    networkDeviceId: { type: mongoose.Schema.Types.ObjectId, ref: 'NetworkDevice', required: true },
     studentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Student', required: true, index: true },
     agentId: { type: String, required: true, trim: true, index: true },
     

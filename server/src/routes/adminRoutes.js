@@ -172,6 +172,7 @@ router.get('/network/gateway/health', requirePermission('WIFI_VIEW'), captivePor
 
 // ── Network Device Discovery ───────────────────────────────────────────────────────
 router.get('/network/devices', requirePermission('WIFI_VIEW'), networkDeviceController.getNetworkDevicesController);
+router.get('/network/devices/summary', requirePermission('WIFI_VIEW'), networkDeviceController.getDeviceSummaryController);
 
 // ── Registered Network Devices ─────────────────────────────────────────────────────
 router.post('/network/devices/:networkDeviceId/link', requirePermission('WIFI_MANAGE'), registeredNetworkDeviceController.linkDeviceController);

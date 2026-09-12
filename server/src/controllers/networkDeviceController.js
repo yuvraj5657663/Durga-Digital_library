@@ -2,7 +2,8 @@ import { successResponse, errorResponse } from '../utils/response.js';
 import { asyncHandler, ValidationError } from '../utils/errors.js';
 import {
   processAgentDevices,
-  getDevicesForAdmin
+  getDevicesForAdmin,
+  getDeviceSummary
 } from '../services/networkDeviceService.js';
 import logger from '../config/logger.js';
 
@@ -66,4 +67,20 @@ export const getNetworkDevicesController = asyncHandler(async (req, res) => {
     devices: result.devices,
     agentHeartbeat: result.agentHeartbeat
   }, 'Network devices retrieved successfully');
+});
+
+/**
+ * Get network device summary statistics
+ */
+export const getDeviceSummaryController = asyncHandler(async (req, res) => {
+  const result = await getDeviceSummary();
+
+  if (!result.success) {
+    return errorResponse(res, {
+      success: false,
+      error: result.error
+    }, 500);
+  }
+
+  return successResponse(res, result.summary, 'Device summary retrieved successfully');
 });

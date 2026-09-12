@@ -29,7 +29,7 @@ const networkDeviceSchema = new mongoose.Schema(
     firstSeen: { type: Date, default: Date.now },
     lastSeen: { type: Date, default: Date.now },
 
-    lastSeenAt: { type: Date, default: Date.now, index: true }
+    lastSeenAt: { type: Date, default: Date.now }
   },
   {
     timestamps: true,
@@ -47,5 +47,6 @@ const networkDeviceSchema = new mongoose.Schema(
 // Compound index for efficient queries
 networkDeviceSchema.index({ agentId: 1, ipAddress: 1, macAddress: 1 }, { unique: true });
 networkDeviceSchema.index({ agentId: 1, status: 1 });
+networkDeviceSchema.index({ lastSeenAt: 1 });
 
 export default mongoose.model('NetworkDevice', networkDeviceSchema);

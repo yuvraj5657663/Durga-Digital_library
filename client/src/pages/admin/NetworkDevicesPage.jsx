@@ -99,12 +99,20 @@ export default function NetworkDevicesPage() {
     refetchIntervalInBackground: true
   });
 
+  const { data: summaryData } = useQuery({
+    queryKey: ['admin', 'network-devices-summary'],
+    queryFn: async () => {
+      const response = await axios.get('/api/v1/admin/network/devices/summary');
+      return response.data;
+    },
+    refetchInterval: 15000,
+    refetchIntervalInBackground: true
+  });
+
   // Fetch student info for each device
   const devices = data?.data?.devices || [];
   const agentHeartbeat = data?.data?.agentHeartbeat;
-  const onlineCount = devices.filter((d) => d.status === 'online').length;
-  const recentlySeenCount = devices.filter((d) => d.status === 'recently_seen').length;
-  const unreachableCount = devices.filter((d) => d.status === 'unreachable').length;
+  const summary = summaryData?.data || {};
 
   const agentStatus = agentHeartbeat?.status || 'unknown';
   const lastSeen = agentHeartbeat?.lastSeen;
@@ -154,20 +162,9 @@ export default function NetworkDevicesPage() {
             {agentStatus === 'online' ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
             Agent: {agentStatus.charAt(0).toUpperCase() + agentStatus.slice(1)}
           </div>
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <Wifi className="w-4 h-4 text-green-600" />
-            {onlineCount} online
-          </div>
-          {recentlySeenCount > 0 && (
-            <div className="flex items-center gap-2 text-sm text-blue-600">
-              <AlertCircle className="w-4 h-4" />
-              {recentlySeenCount} recently seen
-            </div>
-          )}
-          {unreachableCount > 0 && (
-            <div className="flex items-center gap-2 text-sm text-yellow-600">
-              <AlertCircle className="w-4 h-4" />
-              {unreachableCount} unreachable
+          {lastSeen && (
+            <div className="text-xs text-gray-500">
+              Last heartbeat: {formatTimeAgo(lastSeen)}
             </div>
           )}
         </div>
@@ -183,6 +180,45 @@ export default function NetworkDevicesPage() {
           </div>
         </div>
       )}
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+        <div className="card !p-4">
+          <div className="text-xs text-gray-500 uppercase font-medium">Currently Connected</div>
+          <div className="text-2xl font-bold text-gray-900 mt-1">{summary.currentlyConnected || 0}</div>
+          <div className="text-xs text-gray-400 mt-1">Online + Recently Seen</div>
+        </div>
+        <div className="card !p-4">
+          <div className="text-xs text-gray-500 uppercase font-medium">Online</div>
+          <div className="text-2xl font-bold text-green-600 mt-1">{summary.online || 0}</div>
+          <div className="text-xs text-gray-400 mt-1">Reachable</div>
+        </div>
+        <div className="card !p-4">
+          <div className="text-xs text-gray-500 uppercase font-medium">Recently Seen</div>
+          <div className="text-2xl font-bold text-blue-600 mt-1">{summary.recentlySeen || 0}</div>
+          <div className="text-xs text-gray-400 mt-1">In ARP, no ping</div>
+        </div>
+        <div className="card !p-4">
+          <div className="text-xs text-gray-500 uppercase font-medium">Unreachable</div>
+          <div className="text-2xl font-bold text-yellow-600 mt-1">{summary.unreachable || 0}</div>
+          <div className="text-xs text-gray-400 mt-1">Enrichment failed</div>
+        </div>
+        <div className="card !p-4">
+          <div className="text-xs text-gray-500 uppercase font-medium">Offline</div>
+          <div className="text-2xl font-bold text-gray-500 mt-1">{summary.offline || 0}</div>
+          <div className="text-xs text-gray-400 mt-1">Not seen >5 min</div>
+        </div>
+        <div className="card !p-4">
+          <div className="text-xs text-gray-500 uppercase font-medium">Linked Students</div>
+          <div className="text-2xl font-bold text-purple-600 mt-1">{summary.linkedStudents || 0}</div>
+          <div className="text-xs text-gray-400 mt-1">Devices with students</div>
+        </div>
+        <div className="card !p-4">
+          <div className="text-xs text-gray-500 uppercase font-medium">Unlinked</div>
+          <div className="text-2xl font-bold text-gray-600 mt-1">{summary.unlinkedDevices || 0}</div>
+          <div className="text-xs text-gray-400 mt-1">No student association</div>
+        </div>
+      </div>
 
       <div className="card !p-4 flex flex-wrap items-center gap-3">
         <select className="input w-40 text-sm" value={status} onChange={(e) => setStatus(e.target.value)}>
@@ -210,10 +246,10 @@ export default function NetworkDevicesPage() {
         )}
         
         <div className="overflow-x-auto">
-          <table className="min-w-[1100px] w-full text-sm">
+          <table className="min-w-[1300px] w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                {['Device', 'IP Address', 'MAC Address', 'Manufacturer', 'Source', 'Status', 'Linked Student', 'Last Seen', 'Actions'].map((heading) => (
+                {['Status', 'Student', 'Device Name', 'Hostname', 'Manufacturer', 'IP Address', 'MAC Address', 'Last Seen', 'First Seen', 'Source', 'Agent', 'Registration', 'Actions'].map((heading) => (
                   <th key={heading} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">
                     {heading}
                   </th>
@@ -223,38 +259,47 @@ export default function NetworkDevicesPage() {
             <tbody className="divide-y divide-gray-100">
               {isLoading ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-10 text-center text-gray-400">
+                  <td colSpan={13} className="px-4 py-10 text-center text-gray-400">
                     Loading network devices...
                   </td>
                 </tr>
               ) : devices.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-10 text-center text-gray-400">
+                  <td colSpan={13} className="px-4 py-10 text-center text-gray-400">
                     No network devices found.
                   </td>
                 </tr>
               ) : devices.map((device) => (
                 <tr key={device._id || device.ipAddress} className="hover:bg-gray-50">
+                  <td className="px-4 py-4"><StatusBadge status={device.status} /></td>
+                  <td className="px-4 py-4 text-gray-600">{device.linkedStudent ? device.linkedStudent.name : 'Unknown Student'}</td>
                   <td className="px-4 py-4">
                     <div className="flex items-center gap-2">
                       <DeviceIcon deviceName={device.deviceName} manufacturer={device.manufacturer} />
-                      <div>
-                        <div className="font-medium text-gray-900">{device.deviceName}</div>
-                        {device.hostname && device.hostname !== device.deviceName && (
-                          <div className="text-xs text-gray-500">{device.hostname}</div>
-                        )}
-                      </div>
+                      <div className="font-medium text-gray-900">{device.deviceName || 'Unknown Device'}</div>
                     </div>
                   </td>
+                  <td className="px-4 py-4 text-gray-600">{device.hostname || '-'}</td>
+                  <td className="px-4 py-4 text-gray-600">{device.manufacturer || '-'}</td>
                   <td className="px-4 py-4 font-mono text-gray-600">{device.ipAddress}</td>
                   <td className="px-4 py-4 font-mono text-xs text-gray-500">{device.macAddress || '-'}</td>
-                  <td className="px-4 py-4 text-gray-600">{device.manufacturer || '-'}</td>
-                  <td className="px-4 py-4"><SourceBadge source={device.source || 'arp_scan'} /></td>
-                  <td className="px-4 py-4"><StatusBadge status={device.status} /></td>
-                  <td className="px-4 py-4 text-gray-600">{device.linkedStudent ? device.linkedStudent.name : '-'}</td>
                   <td className="px-4 py-4 text-xs text-gray-600">
                     <div>{formatDate(device.lastSeen)}</div>
                     <div className="text-gray-400">{formatTimeAgo(device.lastSeenAt)}</div>
+                  </td>
+                  <td className="px-4 py-4 text-xs text-gray-600">{formatDate(device.firstSeen)}</td>
+                  <td className="px-4 py-4"><SourceBadge source={device.source || 'arp_scan'} /></td>
+                  <td className="px-4 py-4 text-xs text-gray-600">{device.agentId || '-'}</td>
+                  <td className="px-4 py-4">
+                    {device.linkedStudent ? (
+                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                        Linked
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                        Not Linked
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-4">
                     <div className="flex items-center gap-2">

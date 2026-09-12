@@ -25,7 +25,7 @@ const captivePortalSessionSchema = new mongoose.Schema(
     wifiSession: { type: mongoose.Schema.Types.ObjectId, ref: 'WiFiSession', index: true },
 
     createdAt: { type: Date, default: Date.now },
-    expiresAt: { type: Date, required: true, index: true },
+    expiresAt: { type: Date, required: true },
     authenticatedAt: { type: Date },
     authorizedAt: { type: Date },
 

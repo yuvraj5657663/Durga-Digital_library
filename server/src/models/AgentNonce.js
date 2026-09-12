@@ -4,7 +4,7 @@ const agentNonceSchema = new mongoose.Schema(
   {
     agentId: { type: String, required: true, trim: true, index: true },
     nonce: { type: String, required: true, trim: true, index: true },
-    usedAt: { type: Date, required: true, default: Date.now, index: true }
+    usedAt: { type: Date, required: true, default: Date.now }
   },
   {
     timestamps: true,
