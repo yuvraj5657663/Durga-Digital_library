@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { RefreshCw, Wifi, WifiOff, AlertCircle, Laptop, Smartphone, Link as LinkIcon, Unlink, User } from 'lucide-react';
-import axios from 'axios';
+import api from '../../services/api';
 
 const STATUS_STYLES = {
   online: 'bg-green-100 text-green-700',
@@ -92,7 +92,7 @@ export default function NetworkDevicesPage() {
     queryFn: async () => {
       const params = new URLSearchParams();
       if (status) params.append('status', status);
-      const response = await axios.get(`/api/v1/admin/network/devices?${params.toString()}`);
+      const response = await api.get(`/admin/network/devices?${params.toString()}`);
       return response.data;
     },
     refetchInterval: 15000,
@@ -102,7 +102,7 @@ export default function NetworkDevicesPage() {
   const { data: summaryData } = useQuery({
     queryKey: ['admin', 'network-devices-summary'],
     queryFn: async () => {
-      const response = await axios.get('/api/v1/admin/network/devices/summary');
+      const response = await api.get('/admin/network/devices/summary');
       return response.data;
     },
     refetchInterval: 15000,
@@ -119,7 +119,7 @@ export default function NetworkDevicesPage() {
 
   const linkMutation = useMutation({
     mutationFn: async ({ networkDeviceId, studentId, deviceLabel }) => {
-      const response = await axios.post(`/api/v1/admin/network/devices/${networkDeviceId}/link`, {
+      const response = await api.post(`/admin/network/devices/${networkDeviceId}/link`, {
         studentId,
         deviceLabel
       });
@@ -138,7 +138,7 @@ export default function NetworkDevicesPage() {
 
   const unlinkMutation = useMutation({
     mutationFn: async (networkDeviceId) => {
-      const response = await axios.delete(`/api/v1/admin/network/devices/${networkDeviceId}/link`);
+      const response = await api.delete(`/admin/network/devices/${networkDeviceId}/link`);
       return response.data;
     },
     onSuccess: () => {
